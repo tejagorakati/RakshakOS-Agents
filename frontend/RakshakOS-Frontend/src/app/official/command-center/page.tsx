@@ -4,13 +4,12 @@ import React, { useState } from 'react';
 import { PageHeader } from '@/components/official/PageHeader';
 import { OperationalStatCard } from '@/components/official/OperationalStatCard';
 import { SituationOverviewMap } from '@/components/official/SituationOverviewMap';
-import { CriticalAlertsList } from '@/components/official/CriticalAlertsList';
 import { AgentActivitySummaryList } from '@/components/official/AgentActivitySummaryList';
 import { HumanAttentionPanel } from '@/components/official/HumanAttentionPanel';
 import { ResponseStateCard } from '@/components/official/ResponseStateCard';
 import { DetailModal, ModalContentData } from '@/components/official/DetailModal';
 import { mockCommandCenterOverview } from '@/lib/mock/command-center-data';
-import { OperationalStat, OperationalAlert, AgentActivitySummaryEvent } from '@/lib/types/official';
+import { OperationalStat, AgentActivitySummaryEvent } from '@/lib/types/official';
 import { Filter } from 'lucide-react';
 
 export default function CommandCenterPage() {
@@ -30,15 +29,6 @@ export default function CommandCenterPage() {
     setIsModalOpen(false);
     setModalData(null);
   };
-
-  // Filtered Alert Stream
-  const filteredAlerts = data.alerts.filter((alert) => {
-    if (severityFilter === 'ALL') return true;
-    if (severityFilter === 'CRITICAL') return alert.severity === 'CRITICAL';
-    if (severityFilter === 'WARNING') return alert.severity === 'WARNING';
-    if (severityFilter === 'ACTIVE') return alert.severity === 'CRITICAL' || alert.severity === 'WARNING';
-    return true;
-  });
 
   // Filtered Agent Activity Stream
   const filteredAgentEvents = data.agentActivity.filter((evt) => {
@@ -179,24 +169,6 @@ export default function CommandCenterPage() {
     });
   };
 
-  // Select Alert Detail
-  const handleSelectAlert = (alert: OperationalAlert) => {
-    openModal({
-      type: 'ALERT',
-      title: alert.title,
-      subtitle: alert.timestamp,
-      badgeText: alert.severity,
-      badgeVariant: alert.severity === 'CRITICAL' ? 'critical' : alert.severity === 'WARNING' ? 'warning' : 'default',
-      description: alert.message,
-      fields: [
-        { label: 'Event Location', value: alert.location },
-        { label: 'Timestamp', value: alert.timestamp, mono: true },
-        { label: 'Related Incident ID', value: alert.incidentId || 'None', mono: true },
-        { label: 'Related Team ID', value: alert.teamId || 'None', mono: true },
-      ],
-    });
-  };
-
   // Select Agent Activity Event Detail
   const handleSelectAgentEvent = (evt: AgentActivitySummaryEvent) => {
     openModal({
@@ -300,9 +272,8 @@ export default function CommandCenterPage() {
         <SituationOverviewMap zones={data.zones} />
       </section>
 
-      {/* SECTION 4 & 5 — CRITICAL ALERTS & RECENT AGENT ACTIONS */}
-      <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <CriticalAlertsList alerts={filteredAlerts} onSelectAlert={handleSelectAlert} />
+      {/* SECTION 4 — RECENT AGENT OPERATIONAL ACTIONS */}
+      <section>
         <AgentActivitySummaryList events={filteredAgentEvents} onSelectEvent={handleSelectAgentEvent} />
       </section>
 

@@ -32,14 +32,11 @@ export default function RootPortalPage() {
         {/* Hero */}
         <div className="max-w-2xl mb-12">
           <p className="text-[11px] font-mono font-semibold text-slate-500 uppercase tracking-widest mb-3">
-            Emergency Response &amp; Coordination
+            Disaster Response and Resource Management
           </p>
           <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight mb-4">
-            Unified intelligence for life-saving action
+            RakshakOS: A Multiagent Platform for Life Saving Action
           </h1>
-          <p className="text-sm text-slate-600 leading-relaxed">
-            RakshakOS supports coordinated disaster response across emergency operations centers, response teams, field volunteers, and partner organizations.
-          </p>
         </div>
 
         {/* Entry points */}

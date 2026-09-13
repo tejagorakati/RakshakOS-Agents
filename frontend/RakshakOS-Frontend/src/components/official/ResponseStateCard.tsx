@@ -24,7 +24,7 @@ export const ResponseStateCard: React.FC<ResponseStateCardProps> = ({
             Current Active Operational State
           </CardTitle>
           <CardDescription className="text-xs">
-            Primary active response plan tracking current execution vector.
+            Primary active response plan and current assigned route.
           </CardDescription>
         </div>
 
@@ -83,7 +83,7 @@ export const ResponseStateCard: React.FC<ResponseStateCardProps> = ({
           <div className="p-3 rounded-lg border border-slate-200 bg-slate-50 space-y-1">
             <span className="text-[10px] font-semibold text-slate-500 uppercase flex items-center gap-1">
               <Route size={12} className="text-amber-600" />
-              Active Navigation Vector
+              Active Response Route
             </span>
             <div className="font-semibold text-slate-900 text-xs truncate">
               {state.route}

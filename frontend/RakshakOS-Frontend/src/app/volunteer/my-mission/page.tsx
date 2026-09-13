@@ -15,6 +15,7 @@ import {
   Box,
   MapPin,
   ArrowRight,
+  RefreshCw,
 } from 'lucide-react';
 
 export default function MyMissionPage() {
@@ -288,6 +289,58 @@ export default function MyMissionPage() {
               <p className="text-slate-700 line-through font-mono">{mission.previousRoute}</p>
             </div>
           )}
+        </div>
+      </Card>
+
+      {/* Plan V1 → V2 Explanation */}
+      <Card className="p-5 border-slate-200 bg-white shadow-2xs space-y-4 rounded-xl">
+        <div className="border-b border-slate-100 pb-3">
+          <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+            <RefreshCw className="w-4 h-4 text-blue-600" /> Why the Response Plan Changed
+          </h3>
+          <p className="text-xs text-slate-500 font-sans mt-0.5">
+            Understanding Plan V1 and Plan V2 for this mission
+          </p>
+        </div>
+
+        <div className="space-y-3 text-xs">
+          {/* Plan V1 */}
+          <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50 space-y-1.5">
+            <div className="flex items-center gap-2">
+              <span className="font-mono font-bold text-slate-900 text-xs">Plan V1</span>
+              <Badge variant="critical" className="text-[10px] uppercase">No Longer Valid</Badge>
+            </div>
+            <p className="text-slate-700 leading-relaxed">
+              This was the <strong className="text-slate-900">initial response plan</strong> created when the mission was first assigned, based on the situation information available at that time.
+            </p>
+            {mission.previousRoute && (
+              <p className="text-slate-500 text-[11px] italic">
+                Original route: <span className="font-mono line-through">{mission.previousRoute}</span>
+              </p>
+            )}
+          </div>
+
+          {/* What changed */}
+          <div className="p-3.5 rounded-lg border border-amber-200 bg-amber-50/60 space-y-1.5">
+            <span className="text-[10px] font-bold text-amber-800 uppercase block">What changed on the ground:</span>
+            <p className="text-amber-950 leading-relaxed">
+              A field report confirmed that a key condition used in Plan V1 had changed — the original route was found to be impassable. Because the plan was based on that route being accessible, Plan V1 was no longer valid for the current situation.
+            </p>
+          </div>
+
+          {/* Plan V2 */}
+          <div className="p-3.5 rounded-lg border border-emerald-300 bg-emerald-50/60 space-y-1.5">
+            <div className="flex items-center gap-2">
+              <span className="font-mono font-bold text-slate-900 text-xs">Plan V2</span>
+              <Badge variant="success" className="text-[10px] uppercase">Current Plan</Badge>
+            </div>
+            <p className="text-emerald-950 leading-relaxed">
+              This is the <strong className="text-emerald-900">updated response plan</strong>, created to adapt the mission to the new ground situation. It uses a different route and reflects the latest information from the field.
+            </p>
+            <p className="text-emerald-800 text-[11px] font-semibold">
+              Active route: {mission.currentRoute}
+            </p>
+          </div>
         </div>
       </Card>
 

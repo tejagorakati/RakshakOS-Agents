@@ -192,20 +192,20 @@ export const IncidentDetailWorkspace: React.FC<IncidentDetailWorkspaceProps> = (
                       </div>
 
                       <div className="p-2.5 rounded-md bg-white border border-slate-200 space-y-1">
-                        <span className="text-[10px] uppercase font-semibold text-slate-500 block">Navigation Vector Route:</span>
+                        <span className="text-[10px] uppercase font-semibold text-slate-500 block">Active Response Route:</span>
                         <span className="font-semibold text-slate-900 block">{activePlan.route}</span>
                       </div>
                     </div>
 
                     <div className="p-3 rounded-md bg-white border border-slate-200 space-y-1">
-                      <span className="text-[10px] uppercase font-semibold text-slate-500 block">Plan Trigger Event & Reason:</span>
+                      <span className="text-[10px] uppercase font-semibold text-slate-500 block">What changed and why this plan was created:</span>
                       <p className="text-slate-800 text-xs">{activePlan.trigger}</p>
                       <p className="text-slate-600 text-xs italic">{activePlan.changeReason}</p>
                     </div>
 
                     <div className="p-3 rounded-md bg-slate-900 text-white space-y-1">
                       <span className="text-[10px] uppercase font-semibold text-amber-400 block font-mono">
-                        System Execution Trace:
+                        Action Taken by Response System:
                       </span>
                       <p className="text-xs text-slate-200 font-sans">{activePlan.agentAction}</p>
                     </div>
@@ -214,9 +214,14 @@ export const IncidentDetailWorkspace: React.FC<IncidentDetailWorkspaceProps> = (
 
                 {/* Plan History Replanning Timeline */}
                 <div className="space-y-2 pt-2">
-                  <span className="text-xs font-bold text-slate-900 uppercase tracking-wide block">
-                    Replanning Event Timeline for {operation.code}
-                  </span>
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-bold text-slate-900 uppercase tracking-wide block">
+                      Response Plan History for {operation.code}
+                    </span>
+                    <p className="text-[11px] text-slate-500 font-sans leading-relaxed">
+                      Each plan version reflects the response at a point in time. When new ground information showed that a condition used by the previous plan had changed, the old plan was marked invalid and a new plan was created to adapt the response.
+                    </p>
+                  </div>
                   <div className="space-y-2">
                     {operation.plans.map((p, idx) => (
                       <div
@@ -233,9 +238,15 @@ export const IncidentDetailWorkspace: React.FC<IncidentDetailWorkspaceProps> = (
                             <Badge variant={getPlanStatusBadgeVariant(p.status)} className="text-[10px]">
                               {p.status}
                             </Badge>
+                            {p.status === 'ACTIVE' && (
+                              <span className="text-[10px] font-semibold text-emerald-800">— Current plan in use</span>
+                            )}
+                            {(p.status === 'INVALIDATED' || p.status === 'SUPERSEDED') && (
+                              <span className="text-[10px] font-semibold text-slate-500">— No longer valid</span>
+                            )}
                           </div>
                           <p className="text-xs">{p.objective}</p>
-                          <span className="text-[11px] text-slate-500 block italic">Reason: {p.changeReason}</span>
+                          <span className="text-[11px] text-slate-500 block italic">Why this plan was created or replaced: {p.changeReason}</span>
                         </div>
                         <span className="font-mono text-[10px] text-slate-500 shrink-0">{p.timestamp}</span>
                       </div>

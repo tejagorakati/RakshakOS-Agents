@@ -13,6 +13,7 @@ import {
   MapPin,
   Clock,
   Paperclip,
+  ShieldCheck,
 } from 'lucide-react';
 
 export default function ReportSituationPage() {
@@ -56,6 +57,21 @@ export default function ReportSituationPage() {
     setAttachmentName('');
     setSubmittedNotice({ id: newReport.id });
     setTimeout(() => setSubmittedNotice(null), 5000);
+  };
+
+  // Approval Request State
+  const [approvalItemInput, setApprovalItemInput] = useState<string>('');
+  const [approvalDetailsInput, setApprovalDetailsInput] = useState<string>('');
+  const [approvalSubmitted, setApprovalSubmitted] = useState<{ id: string; item: string } | null>(null);
+
+  const handleApprovalSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!approvalItemInput.trim()) return;
+    const requestId = `APR-${Date.now().toString().slice(-4)}`;
+    setApprovalSubmitted({ id: requestId, item: approvalItemInput.trim() });
+    setApprovalItemInput('');
+    setApprovalDetailsInput('');
+    setTimeout(() => setApprovalSubmitted(null), 6000);
   };
 
   const handleSimulateAttachment = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -273,6 +289,105 @@ export default function ReportSituationPage() {
           data={getReportModalData(selectedReportModal)}
         />
       )}
+
+      {/* Approval Request Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Approval Form (2 cols) */}
+        <Card className="lg:col-span-2 p-5 md:p-6 border-slate-200 bg-white shadow-2xs space-y-5 rounded-xl">
+          <div className="border-b border-slate-100 pb-3">
+            <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-amber-600" /> Approval Request
+            </h2>
+            <p className="text-xs text-slate-500">
+              Request an additional resource or essential item from authorized officials. Use this if you are on-site and need something not yet allocated to your mission.
+            </p>
+          </div>
+
+          {approvalSubmitted && (
+            <div className="p-4 bg-amber-50 border border-amber-200 text-amber-950 rounded-lg text-xs font-semibold space-y-1 animate-in fade-in">
+              <div className="flex items-center gap-2 text-amber-900">
+                <CheckCircle2 size={16} className="text-amber-600 shrink-0" />
+                <span className="font-bold text-sm">Request Submitted ({approvalSubmitted.id})</span>
+              </div>
+              <p className="text-amber-900 text-xs pl-6">
+                Your request for <strong>{approvalSubmitted.item}</strong> has been sent to authorized officials for review.
+              </p>
+            </div>
+          )}
+
+          <form onSubmit={handleApprovalSubmit} className="space-y-4">
+            {/* Item Needed */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                Resource / Item Needed *
+              </label>
+              <input
+                type="text"
+                value={approvalItemInput}
+                onChange={(e) => setApprovalItemInput(e.target.value)}
+                placeholder="e.g. Medical kit, Drinking water, Emergency supplies"
+                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg font-sans focus:ring-2 focus:ring-slate-900/20"
+                required
+              />
+            </div>
+
+            {/* Additional Details */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                Additional Details (Optional)
+              </label>
+              <textarea
+                rows={3}
+                value={approvalDetailsInput}
+                onChange={(e) => setApprovalDetailsInput(e.target.value)}
+                placeholder="Describe why this resource is needed or the urgency of the situation..."
+                className="w-full p-3 text-xs border border-slate-300 rounded-lg font-sans focus:ring-2 focus:ring-slate-900/20 resize-none"
+              />
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs py-2.5 cursor-pointer flex items-center justify-center gap-2 shadow-2xs"
+            >
+              <ShieldCheck size={14} /> Ask Approval
+            </Button>
+          </form>
+        </Card>
+
+        {/* Right Column (1 col): What you can request */}
+        <Card className="p-5 border-slate-200 bg-white shadow-2xs space-y-4 rounded-xl">
+          <div className="border-b border-slate-100 pb-3">
+            <h3 className="text-base font-bold text-slate-900">
+              What can you request?
+            </h3>
+            <p className="text-xs text-slate-500">Examples of items you can ask approval for</p>
+          </div>
+
+          <div className="space-y-2 text-xs">
+            {[
+              'Medical kit or first aid supplies',
+              'Drinking water for survivors',
+              'Emergency food rations',
+              'Additional rescue equipment',
+              'Protective gear or safety equipment',
+              'Communication device or radio',
+              'Other essential supplies',
+            ].map((item, idx) => (
+              <div
+                key={idx}
+                className="flex items-center gap-2 p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-700"
+              >
+                <CheckCircle2 size={13} className="text-amber-500 shrink-0" />
+                <span>{item}</span>
+              </div>
+            ))}
+          </div>
+
+          <p className="text-[11px] text-slate-500 leading-relaxed pt-1 border-t border-slate-100">
+            Your request will be reviewed by an authorized official. You will be notified once a decision is made.
+          </p>
+        </Card>
+      </div>
     </div>
   );
 }

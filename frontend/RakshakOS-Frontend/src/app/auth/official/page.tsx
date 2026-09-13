@@ -26,7 +26,7 @@ export default function OfficialAuthPage() {
           <CardHeader className="p-6 space-y-2 border-b border-slate-100 bg-slate-50/50 rounded-t-lg">
             <div className="flex items-center justify-between">
               <Badge variant="outline" className="font-sans text-slate-700 bg-white">
-                Official SSO Integration
+                Official Access
               </Badge>
               <span className="text-xs text-slate-500 font-sans">Authorized Personnel</span>
             </div>
@@ -35,7 +35,7 @@ export default function OfficialAuthPage() {
               Official Command Center Authentication
             </CardTitle>
             <CardDescription className="text-slate-600 text-xs">
-              Single Sign-On portal for Emergency Operations Center (EOC), Police, Fire & Rescue, Medical, and Public Works officials.
+              Secure sign-in portal for Emergency Operations Center (EOC), Police, Fire &amp; Rescue, Medical, and Public Works officials.
             </CardDescription>
           </CardHeader>
 
@@ -46,7 +46,7 @@ export default function OfficialAuthPage() {
                 Government & Agency Authentication Notice
               </div>
               <p className="text-slate-600 text-xs leading-relaxed">
-                Official authentication is integrated via government OAuth SSO. Official access is restricted to verified agency commanders and EOC directors.
+                Official access is restricted to verified agency commanders and EOC directors. Use your agency credentials to sign in.
               </p>
             </div>
 

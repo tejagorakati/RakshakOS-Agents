@@ -145,7 +145,7 @@ export const OfficialNavbar: React.FC = () => {
           <Link href="/auth/official" className="hidden sm:inline-block">
             <Button variant="outline" size="sm" className="text-xs font-sans text-slate-700 border-slate-300">
               <Lock className="w-3 h-3 mr-1 text-slate-500" />
-              SSO Auth
+              Official Sign In
             </Button>
           </Link>
 
@@ -217,7 +217,7 @@ export const OfficialNavbar: React.FC = () => {
               className="flex items-center justify-center gap-2 w-full text-center text-xs font-sans font-semibold py-2 rounded-lg bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200"
             >
               <Lock size={13} />
-              Official SSO Authentication
+              Official Sign In
             </Link>
           </div>
         </div>

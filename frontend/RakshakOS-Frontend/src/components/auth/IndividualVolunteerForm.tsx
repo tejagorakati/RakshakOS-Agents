@@ -18,6 +18,7 @@ const AVAILABLE_SKILLS = [
   'Radio Communications',
   'Logistics & Supply Chain',
   'Firefighting & Hazard Control',
+  'Others',
 ];
 
 const inputBase =
@@ -77,21 +78,6 @@ export const IndividualVolunteerForm: React.FC<IndividualVolunteerFormProps> = (
     };
     const cvDetails = cvFileName && cvFileSize ? { name: cvFileName, size: cvFileSize } : null;
     onSubmit(registrationData, cvDetails);
-  };
-
-  const availabilityColors: Record<AvailabilityStatus, { active: string; idle: string }> = {
-    Available: {
-      active: 'border-emerald-600 bg-emerald-50 text-emerald-900 font-bold',
-      idle: 'border-slate-200 bg-white text-slate-600 hover:border-slate-300',
-    },
-    Busy: {
-      active: 'border-amber-500 bg-amber-50 text-amber-900 font-bold',
-      idle: 'border-slate-200 bg-white text-slate-600 hover:border-slate-300',
-    },
-    Unavailable: {
-      active: 'border-rose-500 bg-rose-50 text-rose-900 font-bold',
-      idle: 'border-slate-200 bg-white text-slate-600 hover:border-slate-300',
-    },
   };
 
   return (
@@ -213,28 +199,6 @@ export const IndividualVolunteerForm: React.FC<IndividualVolunteerFormProps> = (
             })}
           </div>
           {errors.skills && <p className={errorMsg}>{errors.skills}</p>}
-        </div>
-
-        {/* Availability */}
-        <div>
-          <label className={fieldLabel}>Availability <span className="text-rose-500">*</span></label>
-          <div className="grid grid-cols-3 gap-2">
-            {(['Available', 'Busy', 'Unavailable'] as AvailabilityStatus[]).map((status) => {
-              const isSelected = availability === status;
-              return (
-                <button
-                  key={status}
-                  type="button"
-                  onClick={() => setAvailability(status)}
-                  className={`py-2 px-3 rounded-md border text-xs font-semibold text-center transition-colors cursor-pointer ${
-                    isSelected ? availabilityColors[status].active : availabilityColors[status].idle
-                  }`}
-                >
-                  {status}
-                </button>
-              );
-            })}
-          </div>
         </div>
       </div>
 
