@@ -10,7 +10,7 @@ interface IndividualVolunteerFormProps {
 }
 
 const AVAILABLE_SKILLS = [
-  'First Aid / Paramedic',
+  'First Aid / Medical',
   'Search & Rescue',
   'Boat Operations',
   'Shelter Management',
@@ -37,7 +37,7 @@ export const IndividualVolunteerForm: React.FC<IndividualVolunteerFormProps> = (
   const [mobileNumber, setMobileNumber] = useState('');
   const [email, setEmail] = useState('');
   const [regionLocation, setRegionLocation] = useState('');
-  const [skills, setSkills] = useState<string[]>(['First Aid / Paramedic']);
+  const [skills, setSkills] = useState<string[]>(['First Aid / Medical']);
   const [availability, setAvailability] = useState<AvailabilityStatus>('Available');
   const [cvFileName, setCvFileName] = useState<string | null>(null);
   const [cvFileSize, setCvFileSize] = useState<number | null>(null);
@@ -206,7 +206,7 @@ export const IndividualVolunteerForm: React.FC<IndividualVolunteerFormProps> = (
       <div className="px-6 pt-5 pb-5 border-b border-slate-100">
         <span className={sectionLabel}>Qualification Document <span className="text-slate-400 normal-case font-normal tracking-normal">— optional</span></span>
         <CvUpload
-          label="Upload CV / Paramedic Certificate"
+          label="Upload CV / Medical Certificate"
           selectedFileName={cvFileName}
           selectedFileSize={cvFileSize}
           onFileSelect={(fName, fSize) => { setCvFileName(fName); setCvFileSize(fSize); }}

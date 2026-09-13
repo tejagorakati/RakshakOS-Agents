@@ -192,7 +192,7 @@ export default function CommunicationsPage() {
                   className="w-full text-xs p-2 border border-slate-300 rounded-lg bg-slate-50 font-sans focus:ring-2 focus:ring-slate-900/20"
                 >
                   <option value="All Response Teams & Coordinators">All Response Teams & Coordinators</option>
-                  <option value="Medical & Paramedic Units">Medical & Paramedic Units</option>
+                  <option value="Medical Units">Medical Units</option>
                   <option value="Sector Field Coordinators">Sector Field Coordinators</option>
                   <option value="Public Advisory Broadcast">Public Advisory Broadcast</option>
                 </select>

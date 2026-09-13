@@ -50,7 +50,7 @@ export default function RootPortalPage() {
               </div>
               <h2 className="text-base font-bold text-slate-900 mb-1">Official Command Center</h2>
               <p className="text-xs text-slate-500 leading-relaxed mb-4">
-                For EOC commanders, police, fire & rescue, medical, and public works officials. Access incident management, agent activity, resource rosters, and human-in-the-loop approvals.
+                For EOC commanders, police, fire & rescue, medical, and public works officials. Recieve access to incident management, agent activity, resource rosters, and human-in-the-loop approvals.
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {['EOC / Government', 'Police', 'Fire & Rescue', 'Medical', 'Public Works'].map((role) => (
@@ -83,7 +83,7 @@ export default function RootPortalPage() {
               </div>
               <h2 className="text-base font-bold text-slate-900 mb-1">Volunteer Response Center</h2>
               <p className="text-xs text-slate-500 leading-relaxed mb-4">
-                For individual field responders and NGO coordinators. Receive assigned missions, submit ground-truth reports, view allocated equipment, and update availability.
+                For individual volunteers and NGO coordinators. Receive assigned missions, submit ground-truth reports, view allocated equipment, and update availability.
               </p>
               <div className="flex flex-wrap gap-1.5">
                 <span className="text-[11px] px-2 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 font-medium">

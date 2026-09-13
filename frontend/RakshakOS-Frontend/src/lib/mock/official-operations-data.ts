@@ -166,7 +166,7 @@ export const mockDetailedTeams: ResponseTeamItem[] = [
     id: 'TEAM-14',
     code: 'TEAM-14',
     name: 'Medical Response Team 01',
-    type: 'Emergency Paramedic Unit',
+    type: 'Emergency Medical Unit',
     membersCount: 4,
     status: 'DEPLOYED',
     currentAssignment: 'INC-029: Medical Evacuation',
@@ -323,7 +323,7 @@ export const mockBroadcastFeed: OperationalBroadcastMessage[] = [
   },
   {
     id: 'bcast-02',
-    audience: 'Medical & Paramedic Units',
+    audience: 'Medical Units',
     message: 'Notice: Central Shelter at Sector 9 medical desk active for trauma triage.',
     timestamp: '14:10',
     sender: 'Medical Dispatch Desk',

@@ -89,7 +89,7 @@ export const mockResponseOperations: ResponseOperationItem[] = [
     assignedTeamDetail: {
       teamId: 'TEAM-14',
       teamName: 'Medical Response Team 01',
-      type: 'Emergency Paramedic Unit',
+      type: 'Emergency Medical Unit',
       leaderName: 'Dr. Meera Reddy',
       membersCount: 4,
       status: 'ON_SITE',
@@ -111,9 +111,9 @@ export const mockResponseOperations: ResponseOperationItem[] = [
       {
         version: 'V1',
         status: 'SUPERSEDED',
-        objective: 'Standard Paramedic Ambulance dispatch via Main Highway.',
+        objective: 'Standard Medical Ambulance dispatch via Main Highway.',
         assignedTeam: 'Medical Response Team 01',
-        resources: ['Standard Paramedic Ambulance'],
+        resources: ['Standard Medical Ambulance'],
         route: 'Main Highway Sector 4',
         trigger: 'Initial medical alert received.',
         changeReason: 'Water depth increased above 0.8m limit for standard vehicles.',

@@ -107,10 +107,10 @@ export default function CommandCenterPage() {
         subtitle: '84% Overall Capacity Allocated',
         badgeText: '84% ALLOCATED',
         badgeVariant: 'warning',
-        description: 'Resource fleet utilization across vehicles, rescue boats, dewatering pumps, and paramedic kits.',
+        description: 'Resource fleet utilization across vehicles, rescue boats, dewatering pumps, and Mediacl kits.',
         fields: [
           { label: 'Rescue Boats', value: '8 Deployed / 10 Total', mono: true },
-          { label: 'Paramedic Ambulances', value: '12 Deployed / 15 Total', mono: true },
+          { label: 'Ambulances', value: '12 Deployed / 15 Total', mono: true },
           { label: 'Heavy Dewatering Pumps', value: '6 Deployed / 8 Total', mono: true },
           { label: 'Medical First Aid Kits', value: '160 Distributed / 200 Total', mono: true },
         ],

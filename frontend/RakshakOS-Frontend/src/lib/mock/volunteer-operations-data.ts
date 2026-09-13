@@ -137,7 +137,7 @@ export const mockVolunteerMission: VolunteerMission = {
     {
       id: 'tm-3',
       name: 'Priya Sharma',
-      role: 'Emergency Paramedic',
+      role: 'Emergency Medic',
       skills: ['Trauma Care', 'Triage'],
       status: 'En Route',
       contactPhone: '+91 98765-00102',
