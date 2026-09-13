@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RakshakOS Demo - Full Stack AI Disaster Response</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        h1 {
+            color: #1a202c;
+            font-size: 32px;
+            margin-bottom: 12px;
+        }
+        
+        h2 {
+            color: #2d3748;
+            font-size: 20px;
+            margin-bottom: 16px;
+        }
+        
+        h3 {
+            color: #4a5568;
+            font-size: 16px;
+            margin-bottom: 12px;
+        }
+        
+        .status-banner {
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .status-banner.success {
+            background: #d4edda;
+            border: 2px solid #28a745;
+            color: #155724;
+        }
+        
+        .status-banner.warning {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            color: #856404;
+        }
+        
+        .status-banner.error {
+            background: #f8d7da;
+            border: 2px solid #dc3545;
+            color: #721c24;
+        }
+        
+        .button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin: 4px;
+        }
+        
+        .button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .button-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .button-primary:hover:not(:disabled) {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
+        
+        .button-success {
+            background: #28a745;
+            color: white;
+        }
+        
+        .button-success:hover:not(:disabled) {
+            background: #218838;
+            transform: translateY(-2px);
+        }
+        
+        .button-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .button-secondary:hover:not(:disabled) {
+            background: #5a6268;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+        }
+        
+        .stat-value {
+            font-size: 36px;
+            font-weight: bold;
+            margin: 8px 0;
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .data-preview {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 16px;
+            max-height: 400px;
+            overflow: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .info-box {
+            background: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            padding: 16px;
+            margin: 16px 0;
+            border-radius: 4px;
+        }
+        
+        .incident-list {
+            list-style: none;
+        }
+        
+        .incident-item {
+            background: #f8f9fa;
+            padding: 16px;
+            margin: 8px 0;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .incident-title {
+            font-weight: bold;
+            color: #1a202c;
+            margin-bottom: 8px;
+        }
+        
+        .incident-detail {
+            font-size: 14px;
+            color: #4a5568;
+            margin: 4px 0;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-size: 12px;
+            font-weight: 600;
+            margin: 4px;
+        }
+        
+        .badge-critical {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .badge-warning {
+            background: #ffc107;
+            color: #000;
+        }
+        
+        .badge-success {
+            background: #28a745;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="card">
+            <h1>🚀 RakshakOS Full Stack Demo</h1>
+            <p style="color: #4a5568; margin-top: 8px;">AI-Powered Disaster Response Command Center</p>
+        </div>
+
+        <!-- Control Panel -->
+        <div class="card">
+            <h2>Control Panel</h2>
+            
+            <div id="status-banner" class="status-banner warning">
+                <span id="status-text">⏳ Checking backend connection...</span>
+                <button class="button button-secondary" onclick="checkHealth()">Check Health</button>
+            </div>
+
+            <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                <button class="button button-primary" onclick="loadMockData()">
+                    📋 View Mock Data
+                </button>
+                <button class="button button-success" id="live-btn" onclick="loadLiveData()" disabled>
+                    🤖 Run Live AI Pipeline
+                </button>
+            </div>
+
+            <div class="info-box" style="margin-top: 16px;">
+                <strong>📖 Instructions:</strong>
+                <ul style="margin-left: 20px; margin-top: 8px;">
+                    <li><strong>Mock Data:</strong> See example dashboard (works offline)</li>
+                    <li><strong>Live Pipeline:</strong> Run real AI agents through backend</li>
+                    <li><strong>Backend URL:</strong> http://localhost:8000</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Stats Grid -->
+        <div id="stats-section" class="card" style="display: none;">
+            <h2>📊 Operational Metrics</h2>
+            <div class="stats-grid" id="stats-grid"></div>
+        </div>
+
+        <!-- Incidents -->
+        <div id="incidents-section" class="card" style="display: none;">
+            <h2>🚨 Active Incidents</h2>
+            <ul class="incident-list" id="incidents-list"></ul>
+        </div>
+
+        <!-- Teams -->
+        <div id="teams-section" class="card" style="display: none;">
+            <h2>👥 Response Teams</h2>
+            <ul class="incident-list" id="teams-list"></ul>
+        </div>
+
+        <!-- Alerts -->
+        <div id="alerts-section" class="card" style="display: none;">
+            <h2>⚠️ Critical Alerts</h2>
+            <ul class="incident-list" id="alerts-list"></ul>
+        </div>
+
+        <!-- Data Preview -->
+        <div id="data-section" class="card" style="display: none;">
+            <h2>🔍 Raw JSON Data</h2>
+            <div class="data-preview">
+                <pre id="data-preview"></pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8000';
+        let currentData = null;
+
+        // Check backend health on load
+        window.onload = function() {
+            checkHealth();
+        };
+
+        async function checkHealth() {
+            const statusBanner = document.getElementById('status-banner');
+            const statusText = document.getElementById('status-text');
+            const liveBtn = document.getElementById('live-btn');
+
+            try {
+                const response = await fetch(`${API_URL}/`);
+                if (response.ok) {
+                    statusBanner.className = 'status-banner success';
+                    statusText.textContent = '✅ Backend Connected - Ready to process incidents';
+                    liveBtn.disabled = false;
+                } else {
+                    throw new Error('Backend returned error');
+                }
+            } catch (error) {
+                statusBanner.className = 'status-banner error';
+                statusText.innerHTML = '❌ Backend Offline - <strong>Start backend:</strong> Open terminal → cd to project → run <code>python api.py</code>';
+                liveBtn.disabled = true;
+            }
+        }
+
+        function loadMockData() {
+            const mockData = {
+                "disasterScenarioName": "Metro City Flood Response — Monsoon Emergency",
+                "regionLocation": "North Sector EOC Operations Desk",
+                "operationStatus": "RESPONSE ACTIVE",
+                "lastUpdated": new Date().toLocaleTimeString(),
+                "stats": [
+                    { label: "Active Incidents", value: 18, detail: "14 In Progress • 4 Assessing" },
+                    { label: "Critical Incidents", value: 3, detail: "Immediate Action Required" },
+                    { label: "Teams Deployed", value: "12 / 16", detail: "75% Active Deployment" },
+                    { label: "Resource Allocation", value: "84%", detail: "High demand in Sector 7 & 4" }
+                ],
+                "incidents": [
+                    {
+                        code: "INC-032",
+                        title: "Residents Stranded Near North Canal Bank",
+                        priority: "CRITICAL",
+                        status: "DISPATCHED",
+                        location: "North Canal, Sector 7 (SEC-07)",
+                        assignedTeam: "Rescue Team Alpha (NDRF Unit)",
+                        resources: ["2 Inflatable Rescue Boats", "1 Paramedic Ambulance"]
+                    },
+                    {
+                        code: "INC-029",
+                        title: "Emergency Medical Evacuation Request",
+                        priority: "CRITICAL",
+                        status: "ON_SITE",
+                        location: "East Junction, Sector 4 (SEC-04)",
+                        assignedTeam: "Medical Response Team 01",
+                        resources: ["1 Amphibious Medical Transporter"]
+                    }
+                ],
+                "teams": [
+                    {
+                        name: "Rescue Team Alpha",
+                        type: "NDRF Water Rescue Unit",
+                        status: "DEPLOYED",
+                        location: "Sector 7 (SEC-07)",
+                        membersCount: 8
+                    },
+                    {
+                        name: "Medical Response Team 01",
+                        type: "Emergency Paramedic Unit",
+                        status: "DEPLOYED",
+                        location: "Sector 4 (SEC-04)",
+                        membersCount: 4
+                    }
+                ],
+                "alerts": [
+                    {
+                        title: "Embankment Wall Breach Threat",
+                        message: "River embankment wall scouring reported near Sector 7 Housing Complex.",
+                        severity: "CRITICAL",
+                        timestamp: new Date().toLocaleTimeString()
+                    },
+                    {
+                        title: "Bridge 2 Submerged",
+                        message: "Bridge 2 arterial completely submerged. Route rerouted via Eastern Highway.",
+                        severity: "CRITICAL",
+                        timestamp: new Date().toLocaleTimeString()
+                    }
+                ]
+            };
+
+            displayData(mockData, 'mock');
+        }
+
+        async function loadLiveData() {
+            const liveBtn = document.getElementById('live-btn');
+            liveBtn.textContent = '⏳ Processing...';
+            liveBtn.disabled = true;
+
+            try {
+                const response = await fetch(`${API_URL}/process_incident`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        incident_id: 'RK-DEMO-' + Date.now(),
+                        disaster_type: 'flood',
+                        location: 'Vijayawada',
+                        latitude: 16.52,
+                        longitude: 80.64,
+                        priority: 'P1',
+                        requirements: ['boat', 'medical transport'],
+                        reports: [
+                            {
+                                source_type: 'citizen',
+                                claim: 'water entered houses and elderly person needs help',
+                                stale: false
+                            }
+                        ]
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.status}`);
+                }
+
+                const result = await response.json();
+                displayData(result.data, 'live');
+            } catch (error) {
+                alert(`Failed to process incident: ${error.message}\n\nMake sure backend is running on port 8000`);
+            } finally {
+                liveBtn.textContent = '🤖 Run Live AI Pipeline';
+                liveBtn.disabled = false;
+            }
+        }
+
+        function displayData(data, source) {
+            currentData = data;
+
+            // Update header
+            const statusBanner = document.getElementById('status-banner');
+            const statusText = document.getElementById('status-text');
+            
+            if (source === 'mock') {
+                statusBanner.className = 'status-banner warning';
+                statusText.textContent = '📋 Displaying Mock/Example Data';
+            } else {
+                statusBanner.className = 'status-banner success';
+                statusText.textContent = '🤖 Displaying Live AI Pipeline Results';
+            }
+
+            // Display stats
+            const statsGrid = document.getElementById('stats-grid');
+            statsGrid.innerHTML = data.stats.map(stat => `
+                <div class="stat-card">
+                    <div class="stat-label">${stat.label}</div>
+                    <div class="stat-value">${stat.value}</div>
+                    <div class="stat-label">${stat.detail || ''}</div>
+                </div>
+            `).join('');
+            document.getElementById('stats-section').style.display = 'block';
+
+            // Display incidents
+            const incidentsList = document.getElementById('incidents-list');
+            incidentsList.innerHTML = data.incidents.map(inc => `
+                <li class="incident-item">
+                    <div class="incident-title">
+                        ${inc.code}: ${inc.title}
+                        <span class="badge badge-critical">${inc.priority}</span>
+                        <span class="badge badge-success">${inc.status}</span>
+                    </div>
+                    <div class="incident-detail">📍 ${inc.location}</div>
+                    <div class="incident-detail">👥 ${inc.assignedTeam || 'No team assigned'}</div>
+                    <div class="incident-detail">🎒 ${(inc.resources || []).join(', ')}</div>
+                </li>
+            `).join('');
+            document.getElementById('incidents-section').style.display = 'block';
+
+            // Display teams
+            const teamsList = document.getElementById('teams-list');
+            teamsList.innerHTML = data.teams.map(team => `
+                <li class="incident-item">
+                    <div class="incident-title">
+                        ${team.name}
+                        <span class="badge badge-success">${team.status}</span>
+                    </div>
+                    <div class="incident-detail">🔧 ${team.type}</div>
+                    <div class="incident-detail">📍 ${team.location}</div>
+                    <div class="incident-detail">👥 ${team.membersCount} members</div>
+                </li>
+            `).join('');
+            document.getElementById('teams-section').style.display = 'block';
+
+            // Display alerts
+            const alertsList = document.getElementById('alerts-list');
+            alertsList.innerHTML = data.alerts.map(alert => `
+                <li class="incident-item">
+                    <div class="incident-title">
+                        ${alert.title}
+                        <span class="badge badge-critical">${alert.severity}</span>
+                    </div>
+                    <div class="incident-detail">${alert.message}</div>
+                    <div class="incident-detail">🕒 ${alert.timestamp}</div>
+                </li>
+            `).join('');
+            document.getElementById('alerts-section').style.display = 'block';
+
+            // Display JSON
+            const dataPreview = document.getElementById('data-preview');
+            dataPreview.textContent = JSON.stringify(data, null, 2);
+            document.getElementById('data-section').style.display = 'block';
+
+            // Scroll to stats
+            document.getElementById('stats-section').scrollIntoView({ behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>
