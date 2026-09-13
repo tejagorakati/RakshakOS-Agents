@@ -35,7 +35,7 @@ export default function RootPortalPage() {
             Disaster Response and Resource Management
           </p>
           <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight mb-4">
-            RakshakOS: A Multiagent Platform for Life Saving Action
+            <span className="text-slate-900">Rakshak</span><span className="text-amber-600">OS</span>: A Multiagent Platform for Life Saving Action
           </h1>
         </div>
 
