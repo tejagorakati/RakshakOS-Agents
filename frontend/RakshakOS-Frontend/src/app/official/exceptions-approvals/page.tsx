@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { PageHeader } from '@/components/official/PageHeader';
 import { DetailModal, ModalContentData } from '@/components/official/DetailModal';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { mockHumanApprovalsList } from '@/lib/mock/official-operations-data';
 import { HumanAttentionItem } from '@/lib/types/official';
+import { listApprovalRequests, decideApprovalRequest, ApprovalRequest } from '@/lib/api';
 import {
   ShieldAlert,
   CheckCircle2,
@@ -19,13 +20,56 @@ import {
   X,
   Edit,
   AlertTriangle,
+  ShieldCheck,
+  RefreshCw,
 } from 'lucide-react';
+
+const DEMO_INCIDENT_ID = 'INC-DEMO-001';
 
 export default function ExceptionsApprovalsPage() {
   const [approvalsList, setApprovalsList] = useState<HumanAttentionItem[]>(mockHumanApprovalsList);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedModalItem, setSelectedModalItem] = useState<HumanAttentionItem | null>(null);
+
+  // Live volunteer approval requests from the backend
+  const [volunteerApprovals, setVolunteerApprovals] = useState<ApprovalRequest[]>([]);
+  const [isLoadingApprovals, setIsLoadingApprovals] = useState(false);
+  const [decidingId, setDecidingId] = useState<string | null>(null);
+
+  const loadVolunteerApprovals = useCallback(async () => {
+    setIsLoadingApprovals(true);
+    try {
+      const res = await listApprovalRequests(DEMO_INCIDENT_ID);
+      setVolunteerApprovals(res.approval_requests);
+    } catch {
+      // Non-fatal — section stays empty rather than breaking the page
+    } finally {
+      setIsLoadingApprovals(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadVolunteerApprovals();
+  }, [loadVolunteerApprovals]);
+
+  const handleVolunteerDecide = async (requestId: string, decision: 'approved' | 'rejected') => {
+    setDecidingId(requestId);
+    try {
+      const res = await decideApprovalRequest(requestId, {
+        official_id: 'EOC-OFFICIAL',
+        decision,
+      });
+      setVolunteerApprovals((prev) =>
+        prev.map((r) => (r.id === requestId ? res.approval_request : r)),
+      );
+    } catch {
+      // Button re-enables on failure
+    } finally {
+      setDecidingId(null);
+    }
+  };
 
   // Handle Approve action
   const handleApprove = (id: string) => {
@@ -81,7 +125,7 @@ export default function ExceptionsApprovalsPage() {
     return matchesStatus && matchesSearch;
   });
 
-  const getRiskBadgeVariant = (risk: string) => {
+  const getRiskBadgeVariant = (risk: string): 'critical' | 'warning' | 'info' | 'default' => {
     switch (risk) {
       case 'HIGH_RISK':
         return 'critical';
@@ -112,7 +156,7 @@ export default function ExceptionsApprovalsPage() {
     title: item.title,
     subtitle: `Request ID: ${item.id} | Timestamp: ${item.timestamp}`,
     badgeText: item.riskLevel,
-    badgeVariant: getRiskBadgeVariant(item.riskLevel) as any,
+    badgeVariant: getRiskBadgeVariant(item.riskLevel),
     description: item.proposedAction,
     fields: [
       { label: 'Request ID', value: item.id, mono: true },
@@ -237,7 +281,7 @@ export default function ExceptionsApprovalsPage() {
                   <span className="font-mono text-xs font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
                     {item.id}
                   </span>
-                  <Badge variant={getRiskBadgeVariant(item.riskLevel) as any} className="text-xs uppercase">
+                  <Badge variant={getRiskBadgeVariant(item.riskLevel)} className="text-xs uppercase">
                     {item.riskLevel}
                   </Badge>
                   {getStatusBadge(item.status)}
@@ -338,6 +382,108 @@ export default function ExceptionsApprovalsPage() {
                   )}
                 </div>
               </div>
+            </Card>
+          ))
+        )}
+      </div>
+
+      {/* Live Volunteer Resource Approval Requests */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-amber-600" />
+            Volunteer Resource Approval Requests
+            <Badge variant="outline" className="text-xs font-mono ml-1">LIVE</Badge>
+          </h2>
+          <button
+            type="button"
+            onClick={loadVolunteerApprovals}
+            disabled={isLoadingApprovals}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 cursor-pointer"
+          >
+            <RefreshCw size={12} className={isLoadingApprovals ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+        </div>
+
+        {isLoadingApprovals && volunteerApprovals.length === 0 ? (
+          <Card className="p-5 border-slate-200 bg-white shadow-2xs">
+            <div className="flex items-center gap-2 text-slate-500 text-xs">
+              <RefreshCw size={13} className="animate-spin shrink-0" />
+              <span>Loading volunteer approval requests…</span>
+            </div>
+          </Card>
+        ) : volunteerApprovals.length === 0 ? (
+          <Card className="p-6 text-center border-slate-200 bg-white shadow-2xs space-y-1">
+            <CheckCircle2 className="w-7 h-7 text-slate-300 mx-auto" />
+            <p className="text-xs text-slate-500">No volunteer resource requests for this incident.</p>
+          </Card>
+        ) : (
+          volunteerApprovals.map((req) => (
+            <Card
+              key={req.id}
+              className={`p-4 border bg-white shadow-2xs space-y-3 transition-all ${
+                req.status === 'pending'
+                  ? 'border-amber-300 ring-1 ring-amber-200'
+                  : 'border-slate-200'
+              }`}
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-mono text-xs font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                    {req.id}
+                  </span>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono uppercase ${
+                    req.status === 'approved'
+                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                      : req.status === 'rejected'
+                      ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                      : 'bg-amber-100 text-amber-800 border border-amber-300'
+                  }`}>
+                    {req.status}
+                  </span>
+                </div>
+                <span className="text-[11px] text-slate-500 font-mono">
+                  Requester: <strong className="text-slate-800">{req.requester_id}</strong>
+                  {' · '}
+                  {new Date(req.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+
+              <div className="space-y-1 text-xs">
+                <p className="font-bold text-slate-900">{req.item}</p>
+                {req.details && (
+                  <p className="text-slate-600 leading-relaxed">{req.details}</p>
+                )}
+              </div>
+
+              {req.decided_at && (
+                <p className="text-[11px] text-slate-500 font-mono">
+                  Decided: {new Date(req.decided_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {req.official_id ? ` · by ${req.official_id}` : ''}
+                </p>
+              )}
+
+              {req.status === 'pending' && (
+                <div className="pt-2 border-t border-slate-100 flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={decidingId === req.id}
+                    onClick={() => handleVolunteerDecide(req.id, 'approved')}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold disabled:opacity-50 cursor-pointer transition-colors flex items-center gap-1.5"
+                  >
+                    <Check size={13} /> {decidingId === req.id ? '…' : 'Approve'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={decidingId === req.id}
+                    onClick={() => handleVolunteerDecide(req.id, 'rejected')}
+                    className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold disabled:opacity-50 cursor-pointer transition-colors flex items-center gap-1.5"
+                  >
+                    <X size={13} /> {decidingId === req.id ? '…' : 'Reject'}
+                  </button>
+                </div>
+              )}
             </Card>
           ))
         )}

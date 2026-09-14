@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { PageHeader } from '@/components/official/PageHeader';
 import { DetailModal, ModalContentData } from '@/components/official/DetailModal';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { mockFullAgentActivityEvents, FullAgentActivityEvent } from '@/lib/mock/official-operations-data';
+import { getAgentActivity, AgentEvent } from '@/lib/api';
 import {
   Activity,
   Filter,
@@ -16,12 +17,81 @@ import {
   AlertTriangle,
   GitBranch,
   RefreshCw,
+  X,
 } from 'lucide-react';
 
+// Incident ID matches the demo payload used by the Command Center.
+const DEMO_INCIDENT_ID = 'INC-DEMO-001';
+
+/** Map a backend AgentEvent to the FullAgentActivityEvent shape used by the existing render logic. */
+function mapAgentEvent(evt: AgentEvent): FullAgentActivityEvent {
+  const details = evt.details as Record<string, unknown>;
+  // Try to extract useful sub-fields from the specialist result payload
+  const plan   = (details.plan   ?? {}) as Record<string, unknown>;
+  const decision = (details.decision ?? {}) as Record<string, unknown>;
+  const assessment = (details.assessment ?? {}) as Record<string, unknown>;
+
+  const affectedResources: string[] = [];
+  const assignmentsRaw = (decision.assignments ?? []) as unknown[];
+  for (const a of assignmentsRaw) {
+    if (a && typeof a === 'object') {
+      const id = (a as Record<string, unknown>).resource_id;
+      if (typeof id === 'string') affectedResources.push(id);
+    }
+  }
+
+  return {
+    id: evt.id,
+    eventType: (evt.category === 'REPLANNING' ? 'REPLAN_TRIGGERED'
+      : evt.category === 'PLANNING'    ? 'PLAN_UPDATED'
+      : evt.category === 'ALLOCATION'  ? 'RESOURCE_ALLOCATED'
+      : evt.category === 'ASSESSMENT'  ? 'INCIDENT_ASSESSED'
+      : 'PLAN_UPDATED'),
+    category: evt.category as FullAgentActivityEvent['category'],
+    description: evt.description,
+    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    status: 'COMPLETED',
+    incidentId: evt.incident_id,
+    actionPerformed: String(
+      plan.objective ?? decision.rationale ?? assessment.reason ?? evt.description
+    ).slice(0, 200),
+    trigger: `${evt.label} processed incident ${evt.incident_id}.`,
+    affectedTeamName: undefined,
+    affectedResources: affectedResources.length > 0 ? affectedResources : undefined,
+  };
+}
+
 export default function AgentActivityPage() {
+  const [events, setEvents] = useState<FullAgentActivityEvent[]>(mockFullAgentActivityEvents);
+  const [isLive, setIsLive] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedModalEvent, setSelectedModalEvent] = useState<FullAgentActivityEvent | null>(null);
+
+  const loadLiveEvents = useCallback(async () => {
+    setIsLoading(true);
+    setLoadError(null);
+    try {
+      const res = await getAgentActivity(DEMO_INCIDENT_ID);
+      if (res.agent_events.length > 0) {
+        setEvents(res.agent_events.map((e) => mapAgentEvent(e)));
+        setIsLive(true);
+      }
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Could not connect to backend.');
+      // Keep mock data visible
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadLiveEvents();
+  }, [loadLiveEvents]);
 
   const categories = [
     { key: 'ALL', label: 'All Categories' },
@@ -33,7 +103,7 @@ export default function AgentActivityPage() {
     { key: 'REPLANNING', label: 'Replanning' },
   ];
 
-  const filteredEvents = mockFullAgentActivityEvents.filter((evt) => {
+  const filteredEvents = events.filter((evt) => {
     const matchesCategory = selectedCategory === 'ALL' || evt.category === selectedCategory;
     const query = searchQuery.toLowerCase().trim();
     const matchesSearch =
@@ -45,7 +115,7 @@ export default function AgentActivityPage() {
     return matchesCategory && matchesSearch;
   });
 
-  const getCategoryBadgeVariant = (cat: string) => {
+  const getCategoryBadgeVariant = (cat: string): 'critical' | 'info' | 'default' | 'warning' | 'success' | 'outline' => {
     switch (cat) {
       case 'REPLANNING':
         return 'critical';
@@ -70,7 +140,7 @@ export default function AgentActivityPage() {
       title: evt.description,
       subtitle: `Timestamp: ${evt.timestamp} | ID: ${evt.id}`,
       badgeText: evt.category,
-      badgeVariant: getCategoryBadgeVariant(evt.category) as any,
+      badgeVariant: getCategoryBadgeVariant(evt.category),
       description: evt.actionPerformed,
       fields: [
         { label: 'Event ID', value: evt.id, mono: true },
@@ -89,6 +159,29 @@ export default function AgentActivityPage() {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto px-4 md:px-6 py-6 font-sans">
+      {/* Live data status strip */}
+      {isLoading && (
+        <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-600 font-sans">
+          <RefreshCw size={13} className="animate-spin text-slate-500 shrink-0" />
+          <span>Loading agent activity from backend…</span>
+        </div>
+      )}
+      {loadError && !isLoading && (
+        <div className="flex items-start gap-2 px-4 py-2.5 rounded-lg border border-amber-200 bg-amber-50 text-xs text-amber-900 font-sans">
+          <AlertTriangle size={13} className="text-amber-600 shrink-0 mt-0.5" />
+          <span className="flex-1">Backend unavailable — showing prototype data. ({loadError})</span>
+          <button type="button" onClick={() => setLoadError(null)} className="text-amber-600 hover:text-amber-800 cursor-pointer shrink-0" aria-label="Dismiss"><X size={13} /></button>
+        </div>
+      )}
+      {isLive && !isLoading && (
+        <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-emerald-200 bg-emerald-50 text-xs text-emerald-800 font-sans">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+          <span>Live agent activity — incident <span className="font-mono font-bold">{DEMO_INCIDENT_ID}</span>.</span>
+          <button type="button" onClick={loadLiveEvents} className="ml-auto flex items-center gap-1 text-emerald-700 hover:text-emerald-900 cursor-pointer font-semibold">
+            <RefreshCw size={11} /> Refresh
+          </button>
+        </div>
+      )}
       {/* Top Operations Header */}
       <PageHeader
         title="Agent Activity Log"
@@ -106,8 +199,8 @@ export default function AgentActivityPage() {
             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Events</span>
             <Activity className="w-4 h-4 text-blue-600" />
           </div>
-          <p className="text-2xl font-extrabold text-slate-900 font-mono mt-1">142</p>
-          <span className="text-[11px] text-emerald-600 font-medium">Logged in current shift</span>
+          <p className="text-2xl font-extrabold text-slate-900 font-mono mt-1">{events.length}</p>
+          <span className="text-[11px] text-emerald-600 font-medium">{isLive ? 'From backend' : 'Prototype data'}</span>
         </Card>
 
         <Card className="p-4 border-slate-200 bg-white shadow-2xs">
@@ -115,7 +208,9 @@ export default function AgentActivityPage() {
             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Re-Plans Triggered</span>
             <RefreshCw className="w-4 h-4 text-amber-600" />
           </div>
-          <p className="text-2xl font-extrabold text-amber-700 font-mono mt-1">4</p>
+          <p className="text-2xl font-extrabold text-amber-700 font-mono mt-1">
+            {events.filter((e) => e.category === 'REPLANNING').length || events.filter((e) => e.eventType === 'REPLAN_TRIGGERED').length}
+          </p>
           <span className="text-[11px] text-slate-600">Adaptive plan changes</span>
         </Card>
 
@@ -156,7 +251,7 @@ export default function AgentActivityPage() {
           {/* Event Count Indicator */}
           <div className="text-xs text-slate-500 font-mono self-center">
             Showing <span className="font-bold text-slate-900">{filteredEvents.length}</span> of{' '}
-            <span className="font-bold text-slate-900">{mockFullAgentActivityEvents.length}</span> events
+            <span className="font-bold text-slate-900">{events.length}</span> events
           </div>
         </div>
 
@@ -203,7 +298,7 @@ export default function AgentActivityPage() {
                     <Clock size={12} className="text-slate-500" />
                     {evt.timestamp}
                   </span>
-                  <Badge variant={getCategoryBadgeVariant(evt.category) as any} className="text-xs uppercase">
+                  <Badge variant={getCategoryBadgeVariant(evt.category)} className="text-xs uppercase">
                     {evt.category}
                   </Badge>
                   <Badge variant="outline" className="text-xs font-mono text-slate-600">

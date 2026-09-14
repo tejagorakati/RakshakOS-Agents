@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -12,6 +12,7 @@ import {
   NgoMember,
 } from '@/lib/mock/volunteer-operations-data';
 import { useVolunteerSession } from '@/lib/volunteer-session';
+import { listNgoMembers, addNgoMember, ApiError } from '@/lib/api';
 import {
   Building2,
   Users,
@@ -21,12 +22,28 @@ import {
   CheckCircle2,
   Send,
   Paperclip,
+  AlertTriangle,
 } from 'lucide-react';
+
+/** Map a backend member record to the NgoMember shape used by the existing UI. */
+function mapBackendMember(m: { id: string; name: string; email: string; mobile: string; skills: string[] }): NgoMember {
+  return {
+    id: m.id,
+    name: m.name,
+    mobile: m.mobile || '—',
+    email: m.email,
+    skills: m.skills.length > 0 ? m.skills : ['General Responder'],
+    availability: 'Available',
+    currentMission: 'Unassigned (Standby)',
+    cvStatus: 'No CV Attached',
+  };
+}
 
 export default function NgoCoordinatorPage() {
   const { session } = useVolunteerSession();
   const [ngoInfo] = useState(mockNgoData);
   const [members, setMembers] = useState<NgoMember[]>(mockNgoData.registeredMembers);
+  const [isLiveRoster, setIsLiveRoster] = useState(false);
   const [selectedMemberModal, setSelectedMemberModal] = useState<NgoMember | null>(null);
 
   const coordinatorName = session?.fullName || ngoInfo.coordinatorName;
@@ -38,6 +55,8 @@ export default function NgoCoordinatorPage() {
   const [newEmail, setNewEmail] = useState('');
   const [newSkills, setNewSkills] = useState('');
   const [addNotice, setAddNotice] = useState<string | null>(null);
+  const [addError, setAddError] = useState<string | null>(null);
+  const [isAddingMember, setIsAddingMember] = useState(false);
 
   // Excel Upload State
   const [excelFileName, setExcelFileName] = useState<string | null>(null);
@@ -63,31 +82,84 @@ export default function NgoCoordinatorPage() {
     },
   ]);
 
+  // Load roster from backend when session has a coordinator ID
+  const sessionId = session?.id ?? null;
+  const loadRoster = useCallback(async () => {
+    if (!sessionId) return;
+    try {
+      const res = await listNgoMembers(sessionId);
+      if (res.members.length > 0) {
+        const mapped = res.members.map(mapBackendMember);
+        setMembers(mapped);
+        setIsLiveRoster(true);
+        setCvMemberId(mapped[0]?.id || '');
+        setCommTargetId(mapped[0]?.id || '');
+      }
+    } catch {
+      // Backend unavailable — keep mock data
+    }
+  }, [sessionId]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadRoster();
+  }, [loadRoster]);
+
   // Handle Manual Add Member
-  const handleAddMember = (e: React.FormEvent) => {
+  const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim() || !newMobile.trim() || !newEmail.trim()) return;
 
-    const newMember: NgoMember = {
+    setIsAddingMember(true);
+    setAddError(null);
+
+    const skills = newSkills
+      ? newSkills.split(',').map((s) => s.trim()).filter(Boolean)
+      : ['General Rescue Assistant', 'First Aid'];
+
+    // Optimistic local entry
+    const localMember: NgoMember = {
       id: `ngo-mem-${Date.now().toString().slice(-4)}`,
       name: newName.trim(),
       mobile: newMobile.trim(),
       email: newEmail.trim(),
-      skills: newSkills
-        ? newSkills.split(',').map((s) => s.trim())
-        : ['General Rescue Assistant', 'First Aid'],
+      skills,
       availability: 'Available',
       currentMission: 'Unassigned (Standby)',
       cvStatus: 'No CV Attached',
     };
 
-    setMembers([...members, newMember]);
-    setNewName('');
-    setNewMobile('');
-    setNewEmail('');
-    setNewSkills('');
-    setAddNotice(`Member "${newMember.name}" successfully added to NGO roster.`);
-    setTimeout(() => setAddNotice(null), 4000);
+    try {
+      if (sessionId) {
+        const res = await addNgoMember(sessionId, {
+          name: newName.trim(),
+          email: newEmail.trim(),
+          mobile: newMobile.trim(),
+          skills,
+        });
+        // Use server-assigned ID
+        localMember.id = res.member.id;
+      }
+      setMembers((prev) => [...prev, localMember]);
+      setNewName('');
+      setNewMobile('');
+      setNewEmail('');
+      setNewSkills('');
+      setAddNotice(`Member "${localMember.name}" successfully added to NGO roster.`);
+      setTimeout(() => setAddNotice(null), 4000);
+    } catch (err) {
+      // Still add locally so the UI is usable offline
+      setMembers((prev) => [...prev, localMember]);
+      setNewName('');
+      setNewMobile('');
+      setNewEmail('');
+      setNewSkills('');
+      const msg = err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Backend unavailable.';
+      setAddError(`Added locally only — ${msg}`);
+      setTimeout(() => setAddError(null), 6000);
+    } finally {
+      setIsAddingMember(false);
+    }
   };
 
   // Handle CV Attachment
@@ -197,7 +269,7 @@ export default function NgoCoordinatorPage() {
             </p>
           </div>
           <Badge variant="outline" className="text-xs font-mono">
-            ROSTER COUNT: {members.length}
+            ROSTER COUNT: {members.length}{isLiveRoster ? ' · LIVE' : ''}
           </Badge>
         </div>
 
@@ -262,6 +334,13 @@ export default function NgoCoordinatorPage() {
             </div>
           )}
 
+          {addError && (
+            <div className="p-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-lg text-xs font-semibold flex items-center gap-2 animate-in fade-in">
+              <AlertTriangle size={14} className="text-amber-600 shrink-0" />
+              <span>{addError}</span>
+            </div>
+          )}
+
           <form onSubmit={handleAddMember} className="space-y-3 text-xs">
             <div className="space-y-1">
               <label className="font-bold text-slate-700 uppercase text-[10px]">Member Full Name *</label>
@@ -314,9 +393,10 @@ export default function NgoCoordinatorPage() {
 
             <Button
               type="submit"
-              className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs py-2.5 cursor-pointer flex items-center justify-center gap-2 shadow-2xs"
+              disabled={isAddingMember}
+              className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs py-2.5 cursor-pointer flex items-center justify-center gap-2 shadow-2xs disabled:opacity-60"
             >
-              <UserPlus size={14} /> Add Member to Roster
+              <UserPlus size={14} /> {isAddingMember ? 'Adding…' : 'Add Member to Roster'}
             </Button>
           </form>
         </Card>

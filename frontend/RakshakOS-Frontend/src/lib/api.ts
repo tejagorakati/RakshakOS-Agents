@@ -354,3 +354,87 @@ export async function getApprovalRequest(
   }
   return res.json() as Promise<GetApprovalResponse>;
 }
+
+// ---------------------------------------------------------------------------
+// Agent activity (read-only — does NOT re-run the pipeline)
+// ---------------------------------------------------------------------------
+
+export interface AgentEvent {
+  id: string;
+  agent: string;
+  label: string;
+  category: 'ASSESSMENT' | 'PLANNING' | 'ALLOCATION' | 'EXECUTION' | 'MONITORING' | 'REPLANNING' | 'COMMUNICATION';
+  description: string;
+  status: 'COMPLETED';
+  incident_id: string;
+  details: Record<string, unknown>;
+}
+
+export interface AgentActivityResponse {
+  status: string;
+  incident_id: string;
+  plan_version: number;
+  agent_events: AgentEvent[];
+}
+
+export async function getAgentActivity(
+  incidentId: string,
+): Promise<AgentActivityResponse> {
+  const res = await fetch(
+    `${BASE_URL}/incidents/${incidentId}/agent-activity`,
+    { cache: 'no-store' },
+  );
+  if (!res.ok) {
+    throw new ApiError(res.status, `HTTP ${res.status}`);
+  }
+  return res.json() as Promise<AgentActivityResponse>;
+}
+
+// ---------------------------------------------------------------------------
+// Incident messages
+// ---------------------------------------------------------------------------
+
+export interface IncidentMessage {
+  id: string;
+  sender: string;
+  message: string;
+  created_at: string;
+}
+
+export interface GetMessagesResponse {
+  status: string;
+  messages: IncidentMessage[];
+}
+
+export async function getIncidentMessages(
+  incidentId: string,
+): Promise<GetMessagesResponse> {
+  const res = await fetch(
+    `${BASE_URL}/incidents/${incidentId}/messages`,
+    { cache: 'no-store' },
+  );
+  if (!res.ok) {
+    throw new ApiError(res.status, `HTTP ${res.status}`);
+  }
+  return res.json() as Promise<GetMessagesResponse>;
+}
+
+export interface PostMessageRequest {
+  sender: string;
+  message: string;
+}
+
+export interface PostMessageResponse {
+  status: string;
+  message_id: string;
+}
+
+export async function postIncidentMessage(
+  incidentId: string,
+  req: PostMessageRequest,
+): Promise<PostMessageResponse> {
+  return apiPost<PostMessageResponse>(
+    `/incidents/${incidentId}/messages`,
+    req,
+  );
+}

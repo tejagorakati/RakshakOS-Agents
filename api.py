@@ -663,6 +663,71 @@ async def get_approval_request(request_id: str) -> dict:
     }
 
 
+@app.get("/incidents/{incident_id}/agent-activity")
+async def get_agent_activity(incident_id: str) -> dict:
+    """
+    Read-only: return the agent specialist_results stored from the last pipeline run.
+    Does NOT re-run any agent.
+    """
+    output = _load_incident_output(incident_id)
+    if output is None:
+        raise HTTPException(status_code=404, detail="Incident not found or not yet processed")
+
+    specialists = _as_list(output.get("specialist_results", []))
+    events = []
+    # Map each specialist result to a UI-friendly event object
+    agent_labels = {
+        "situation_impact":    ("Situation & Impact Assessment", "ASSESSMENT"),
+        "ground_verification": ("Ground Verification",           "ASSESSMENT"),
+        "resource_management": ("Resource Management",           "ALLOCATION"),
+        "response_planning":   ("Response Planning",             "PLANNING"),
+    }
+    summary = _as_dict(output.get("summary", {}))
+    for idx, item in enumerate(_as_list(specialists)):
+        item = _as_dict(item)
+        agent = item.get("agent", "unknown")
+        label, category = agent_labels.get(agent, (agent.replace("_", " ").title(), "EXECUTION"))
+        # Derive a brief description from whatever data the agent produced
+        result_keys = [k for k in item if k not in ("agent",)]
+        detail_obj = _as_dict(item.get(result_keys[0], {})) if result_keys else {}
+        description = (
+            detail_obj.get("reason")
+            or detail_obj.get("objective")
+            or detail_obj.get("rationale")
+            or f"{label} completed."
+        )
+        events.append({
+            "id": f"AGT-{incident_id[-6:]}-{idx:02d}",
+            "agent": agent,
+            "label": label,
+            "category": category,
+            "description": str(description)[:300],
+            "status": "COMPLETED",
+            "incident_id": incident_id,
+            "details": item,
+        })
+
+    # Append the orchestrator summary as the final event if present
+    if summary:
+        events.append({
+            "id": f"AGT-{incident_id[-6:]}-SUM",
+            "agent": "orchestrator",
+            "label": "PathaRaksha Orchestrator",
+            "category": "EXECUTION",
+            "description": str(summary.get("next_action") or summary.get("status") or "Pipeline complete.")[:300],
+            "status": "COMPLETED",
+            "incident_id": incident_id,
+            "details": summary,
+        })
+
+    return {
+        "status": "success",
+        "incident_id": incident_id,
+        "plan_version": output.get("plan_version") or summary.get("plan_version") or 1,
+        "agent_events": events,
+    }
+
+
 @app.post("/process_incident")
 async def process_incident(request: IncidentRequest) -> dict:
     """
