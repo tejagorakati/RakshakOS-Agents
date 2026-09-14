@@ -255,3 +255,102 @@ export async function listNgoMembers(
 }
 
 export { ApiError };
+
+// ---------------------------------------------------------------------------
+// Approval requests
+// ---------------------------------------------------------------------------
+
+export interface ApprovalRequest {
+  id: string;
+  incident_id: string;
+  requester_id: string;
+  item: string;
+  details: string;
+  /** "pending" | "approved" | "rejected" */
+  status: 'pending' | 'approved' | 'rejected';
+  created_at: string;
+  decided_at: string | null;
+  official_id: string | null;
+}
+
+export interface CreateApprovalRequest {
+  requester_id: string;
+  item: string;
+  details?: string;
+}
+
+export interface CreateApprovalResponse {
+  status: string;
+  approval_request: ApprovalRequest;
+}
+
+export interface ListApprovalsResponse {
+  status: string;
+  approval_requests: ApprovalRequest[];
+}
+
+export interface DecideApprovalRequest {
+  official_id: string;
+  /** "approved" | "rejected" */
+  decision: 'approved' | 'rejected';
+}
+
+export interface DecideApprovalResponse {
+  status: string;
+  approval_request: ApprovalRequest;
+}
+
+export interface GetApprovalResponse {
+  status: string;
+  approval_request: ApprovalRequest;
+}
+
+/** Volunteer: submit a resource approval request for an active incident. */
+export async function createApprovalRequest(
+  incidentId: string,
+  req: CreateApprovalRequest,
+): Promise<CreateApprovalResponse> {
+  return apiPost<CreateApprovalResponse>(
+    `/incidents/${incidentId}/approvals`,
+    req,
+  );
+}
+
+/** Official: list all approval requests for an incident. */
+export async function listApprovalRequests(
+  incidentId: string,
+): Promise<ListApprovalsResponse> {
+  const res = await fetch(
+    `${BASE_URL}/incidents/${incidentId}/approvals`,
+    { cache: 'no-store' },
+  );
+  if (!res.ok) {
+    throw new ApiError(res.status, `HTTP ${res.status}`);
+  }
+  return res.json() as Promise<ListApprovalsResponse>;
+}
+
+/** Official: approve or reject a pending approval request. */
+export async function decideApprovalRequest(
+  requestId: string,
+  req: DecideApprovalRequest,
+): Promise<DecideApprovalResponse> {
+  return apiPost<DecideApprovalResponse>(
+    `/approvals/${requestId}/decide`,
+    req,
+  );
+}
+
+/** Volunteer: poll the current status of their approval request. */
+export async function getApprovalRequest(
+  requestId: string,
+): Promise<GetApprovalResponse> {
+  const res = await fetch(
+    `${BASE_URL}/approvals/${requestId}`,
+    { cache: 'no-store' },
+  );
+  if (!res.ok) {
+    throw new ApiError(res.status, `HTTP ${res.status}`);
+  }
+  return res.json() as Promise<GetApprovalResponse>;
+}

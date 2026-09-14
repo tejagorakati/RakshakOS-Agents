@@ -88,6 +88,19 @@ class IntelligenceRequest(BaseModel):
     longitude: float = 0.0
 
 
+class ApprovalRequestCreate(BaseModel):
+    """Volunteer submits a resource approval request for an incident."""
+    requester_id: str
+    item: str
+    details: str = ""
+
+
+class ApprovalDecision(BaseModel):
+    """Official approves or rejects a pending approval request."""
+    official_id: str
+    decision: str  # "approved" | "rejected"
+
+
 class TeamMemberRequest(BaseModel):
     name: str
     email: str
@@ -157,6 +170,17 @@ def _init_db() -> None:
                 incident_id TEXT PRIMARY KEY,
                 status TEXT NOT NULL,
                 closed_at TEXT
+            );
+            CREATE TABLE IF NOT EXISTS approval_requests (
+                id TEXT PRIMARY KEY,
+                incident_id TEXT NOT NULL,
+                requester_id TEXT NOT NULL,
+                item TEXT NOT NULL,
+                details TEXT NOT NULL,
+                status TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                decided_at TEXT,
+                official_id TEXT
             );
             """
         )
@@ -504,6 +528,139 @@ async def ingest_intelligence(request: IntelligenceRequest) -> dict:
     if not content:
         raise HTTPException(status_code=400, detail="Add report text or a public source URL")
     return _run_intelligence_loop(request, content, source)
+
+
+@app.post("/incidents/{incident_id}/approvals")
+async def create_approval_request(incident_id: str, request: ApprovalRequestCreate) -> dict:
+    """Volunteer creates a resource approval request for an active incident."""
+    if not incident_id.strip():
+        raise HTTPException(status_code=400, detail="incident_id is required")
+    if not request.item.strip():
+        raise HTTPException(status_code=400, detail="item is required")
+    if not request.requester_id.strip():
+        raise HTTPException(status_code=400, detail="requester_id is required")
+
+    approval_id = f"APR-{secrets.token_hex(5).upper()}"
+    now = datetime.now(timezone.utc).isoformat()
+    with _db() as connection:
+        connection.execute(
+            "INSERT INTO approval_requests VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                approval_id,
+                incident_id.strip(),
+                request.requester_id.strip(),
+                request.item.strip(),
+                request.details.strip(),
+                "pending",
+                now,
+                None,
+                None,
+            ),
+        )
+    return {
+        "status": "success",
+        "approval_request": {
+            "id": approval_id,
+            "incident_id": incident_id.strip(),
+            "requester_id": request.requester_id.strip(),
+            "item": request.item.strip(),
+            "details": request.details.strip(),
+            "status": "pending",
+            "created_at": now,
+            "decided_at": None,
+            "official_id": None,
+        },
+    }
+
+
+@app.get("/incidents/{incident_id}/approvals")
+async def list_approval_requests(incident_id: str) -> dict:
+    """Official retrieves all approval requests for a given incident."""
+    with _db() as connection:
+        rows = connection.execute(
+            "SELECT * FROM approval_requests WHERE incident_id = ? ORDER BY created_at DESC",
+            (incident_id,),
+        ).fetchall()
+    return {
+        "status": "success",
+        "approval_requests": [
+            {
+                "id": row["id"],
+                "incident_id": row["incident_id"],
+                "requester_id": row["requester_id"],
+                "item": row["item"],
+                "details": row["details"],
+                "status": row["status"],
+                "created_at": row["created_at"],
+                "decided_at": row["decided_at"],
+                "official_id": row["official_id"],
+            }
+            for row in rows
+        ],
+    }
+
+
+@app.post("/approvals/{request_id}/decide")
+async def decide_approval_request(request_id: str, request: ApprovalDecision) -> dict:
+    """Official approves or rejects a pending approval request."""
+    if request.decision not in {"approved", "rejected"}:
+        raise HTTPException(status_code=400, detail="decision must be 'approved' or 'rejected'")
+
+    with _db() as connection:
+        row = connection.execute(
+            "SELECT * FROM approval_requests WHERE id = ?", (request_id,)
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Approval request not found")
+        if row["status"] != "pending":
+            raise HTTPException(
+                status_code=409,
+                detail=f"Request is already '{row['status']}' and cannot be changed",
+            )
+        now = datetime.now(timezone.utc).isoformat()
+        connection.execute(
+            "UPDATE approval_requests SET status = ?, decided_at = ?, official_id = ? WHERE id = ?",
+            (request.decision, now, request.official_id.strip(), request_id),
+        )
+    return {
+        "status": "success",
+        "approval_request": {
+            "id": request_id,
+            "incident_id": row["incident_id"],
+            "requester_id": row["requester_id"],
+            "item": row["item"],
+            "details": row["details"],
+            "status": request.decision,
+            "created_at": row["created_at"],
+            "decided_at": now,
+            "official_id": request.official_id.strip(),
+        },
+    }
+
+
+@app.get("/approvals/{request_id}")
+async def get_approval_request(request_id: str) -> dict:
+    """Volunteer polls the current status of their approval request."""
+    with _db() as connection:
+        row = connection.execute(
+            "SELECT * FROM approval_requests WHERE id = ?", (request_id,)
+        ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Approval request not found")
+    return {
+        "status": "success",
+        "approval_request": {
+            "id": row["id"],
+            "incident_id": row["incident_id"],
+            "requester_id": row["requester_id"],
+            "item": row["item"],
+            "details": row["details"],
+            "status": row["status"],
+            "created_at": row["created_at"],
+            "decided_at": row["decided_at"],
+            "official_id": row["official_id"],
+        },
+    }
 
 
 @app.post("/process_incident")

@@ -10,9 +10,9 @@ import { ResponseStateCard } from '@/components/official/ResponseStateCard';
 import { DetailModal, ModalContentData } from '@/components/official/DetailModal';
 import { mockCommandCenterOverview } from '@/lib/mock/command-center-data';
 import { CommandCenterOverview, OperationalStat, AgentActivitySummaryEvent } from '@/lib/types/official';
-import { processIncident } from '@/lib/api';
+import { processIncident, listApprovalRequests, decideApprovalRequest, ApprovalRequest } from '@/lib/api';
 import { saveVolunteerSession, getVolunteerSession } from '@/lib/volunteer-session';
-import { Filter, RefreshCw, AlertTriangle, X } from 'lucide-react';
+import { Filter, RefreshCw, AlertTriangle, X, ShieldCheck } from 'lucide-react';
 
 // Demo incident payload — matches the Vijayawada flood scenario the backend agents are tuned for.
 // Coordinates: Vijayawada, Andhra Pradesh.
@@ -37,6 +37,40 @@ export default function CommandCenterPage() {
   const [isLive, setIsLive] = useState(false);
   const [isLoadingLive, setIsLoadingLive] = useState(false);
   const [liveError, setLiveError] = useState<string | null>(null);
+
+  // Approval requests state
+  const [approvals, setApprovals] = useState<ApprovalRequest[]>([]);
+  const [isLoadingApprovals, setIsLoadingApprovals] = useState(false);
+  const [decidingId, setDecidingId] = useState<string | null>(null);
+
+  const loadApprovals = useCallback(async () => {
+    setIsLoadingApprovals(true);
+    try {
+      const res = await listApprovalRequests(DEMO_INCIDENT_PAYLOAD.incident_id);
+      setApprovals(res.approval_requests);
+    } catch {
+      // Non-fatal — approval panel stays empty rather than breaking the page
+    } finally {
+      setIsLoadingApprovals(false);
+    }
+  }, []);
+
+  const handleDecide = async (requestId: string, decision: 'approved' | 'rejected') => {
+    setDecidingId(requestId);
+    try {
+      const res = await decideApprovalRequest(requestId, {
+        official_id: 'EOC-OFFICIAL',
+        decision,
+      });
+      setApprovals((prev) =>
+        prev.map((r) => (r.id === requestId ? res.approval_request : r)),
+      );
+    } catch {
+      // Decision failure is surfaced by the button re-enabling
+    } finally {
+      setDecidingId(null);
+    }
+  };
 
   // Fetch live data from the backend on mount
   const loadLiveData = useCallback(async () => {
@@ -70,7 +104,8 @@ export default function CommandCenterPage() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadLiveData();
-  }, [loadLiveData]);
+    loadApprovals();
+  }, [loadLiveData, loadApprovals]);
 
   // Local Interactivity State
   const [severityFilter, setSeverityFilter] = useState<'ALL' | 'CRITICAL' | 'WARNING' | 'ACTIVE'>('ALL');
@@ -356,6 +391,116 @@ export default function CommandCenterPage() {
       {/* SECTION 6 — HUMAN ATTENTION (EXCEPTIONAL APPROVALS GATE) */}
       <section>
         <HumanAttentionPanel items={data.humanAttentionItems} />
+      </section>
+
+      {/* SECTION — VOLUNTEER APPROVAL REQUESTS */}
+      <section>
+        <div className="border border-slate-200 bg-white shadow-2xs rounded-xl overflow-hidden">
+          {/* Header */}
+          <div className="bg-slate-50/60 px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
+            <div className="space-y-0.5">
+              <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-amber-600" />
+                Volunteer Approval Requests
+              </h2>
+              <p className="text-xs text-slate-500 font-sans">
+                Resource requests submitted by field volunteers for this incident.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={loadApprovals}
+              disabled={isLoadingApprovals}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 cursor-pointer"
+            >
+              <RefreshCw size={12} className={isLoadingApprovals ? 'animate-spin' : ''} />
+              Refresh
+            </button>
+          </div>
+
+          {/* Body */}
+          <div className="p-5 font-sans text-xs">
+            {isLoadingApprovals && approvals.length === 0 ? (
+              <div className="flex items-center gap-2 text-slate-500 py-4">
+                <RefreshCw size={13} className="animate-spin shrink-0" />
+                <span>Loading approval requests…</span>
+              </div>
+            ) : approvals.length === 0 ? (
+              <div className="py-6 text-center text-slate-400 text-xs">
+                No approval requests for this incident yet.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {approvals.map((req) => (
+                  <div
+                    key={req.id}
+                    className={`p-3.5 rounded-lg border flex flex-col sm:flex-row sm:items-start justify-between gap-3 ${
+                      req.status === 'approved'
+                        ? 'bg-emerald-50/50 border-emerald-200'
+                        : req.status === 'rejected'
+                        ? 'bg-rose-50/50 border-rose-200'
+                        : 'bg-amber-50/50 border-amber-200'
+                    }`}
+                  >
+                    {/* Left: request detail */}
+                    <div className="space-y-1 flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono font-bold text-slate-900 text-[11px]">{req.id}</span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono uppercase ${
+                          req.status === 'approved'
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                            : req.status === 'rejected'
+                            ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                            : 'bg-amber-100 text-amber-800 border border-amber-300'
+                        }`}>
+                          {req.status}
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-mono">
+                          {new Date(req.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <p className="font-semibold text-slate-900 truncate">{req.item}</p>
+                      {req.details && (
+                        <p className="text-slate-600 leading-relaxed">{req.details}</p>
+                      )}
+                      <p className="text-[10px] text-slate-400 font-mono">
+                        Requester: {req.requester_id}
+                      </p>
+                      {req.decided_at && (
+                        <p className="text-[10px] text-slate-500 font-mono">
+                          Decided: {new Date(req.decided_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {req.official_id ? ` · by ${req.official_id}` : ''}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Right: action buttons — only shown while pending */}
+                    {req.status === 'pending' && (
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          disabled={decidingId === req.id}
+                          onClick={() => handleDecide(req.id, 'approved')}
+                          className="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold disabled:opacity-50 cursor-pointer transition-colors"
+                        >
+                          {decidingId === req.id ? '…' : 'Approve'}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={decidingId === req.id}
+                          onClick={() => handleDecide(req.id, 'rejected')}
+                          className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold disabled:opacity-50 cursor-pointer transition-colors"
+                        >
+                          {decidingId === req.id ? '…' : 'Reject'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </section>
 
       {/* SECTION 3 — SITUATION OVERVIEW MAP & SECTOR CONCENTRATION */}

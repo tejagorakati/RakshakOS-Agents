@@ -8,7 +8,7 @@ import { DetailModal, ModalContentData } from '@/components/official/DetailModal
 import { mockFieldReports, FieldSituationReport } from '@/lib/mock/volunteer-operations-data';
 import { mockVolunteerMission } from '@/lib/mock/volunteer-operations-data';
 import { getVolunteerSession } from '@/lib/volunteer-session';
-import { submitFieldReport, ApiError } from '@/lib/api';
+import { submitFieldReport, createApprovalRequest, getApprovalRequest, ApiError, ApprovalRequest } from '@/lib/api';
 import {
   FileText,
   Send,
@@ -39,7 +39,10 @@ export default function ReportSituationPage() {
   // Approval Request State
   const [approvalItemInput, setApprovalItemInput] = useState<string>('');
   const [approvalDetailsInput, setApprovalDetailsInput] = useState<string>('');
-  const [approvalSubmitted, setApprovalSubmitted] = useState<{ id: string; item: string } | null>(null);
+  const [approvalSubmitted, setApprovalSubmitted] = useState<ApprovalRequest | null>(null);
+  const [isSubmittingApproval, setIsSubmittingApproval] = useState(false);
+  const [approvalError, setApprovalError] = useState<string | null>(null);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
 
   // Resolve the active incident ID from the volunteer session on mount.
   // The session's currentIncidentId is written by the command-center page
@@ -129,14 +132,52 @@ export default function ReportSituationPage() {
     }
   };
 
-  const handleApprovalSubmit = (e: React.FormEvent) => {
+  const handleApprovalSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!approvalItemInput.trim()) return;
-    const requestId = `APR-${Date.now().toString().slice(-4)}`;
-    setApprovalSubmitted({ id: requestId, item: approvalItemInput.trim() });
-    setApprovalItemInput('');
-    setApprovalDetailsInput('');
-    setTimeout(() => setApprovalSubmitted(null), 6000);
+
+    const session = getVolunteerSession();
+    if (!session?.id) {
+      setApprovalError('You must be registered to submit an approval request. Please sign in first.');
+      return;
+    }
+
+    setIsSubmittingApproval(true);
+    setApprovalError(null);
+
+    try {
+      const response = await createApprovalRequest(incidentId, {
+        requester_id: session.id,
+        item: approvalItemInput.trim(),
+        details: approvalDetailsInput.trim(),
+      });
+      setApprovalSubmitted(response.approval_request);
+      setApprovalItemInput('');
+      setApprovalDetailsInput('');
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+          ? err.message
+          : 'Request could not be submitted. Please try again.';
+      setApprovalError(message);
+    } finally {
+      setIsSubmittingApproval(false);
+    }
+  };
+
+  const handleCheckApprovalStatus = async () => {
+    if (!approvalSubmitted?.id) return;
+    setIsCheckingStatus(true);
+    try {
+      const response = await getApprovalRequest(approvalSubmitted.id);
+      setApprovalSubmitted(response.approval_request);
+    } catch {
+      // Status check failure is non-fatal — keep showing the last known status
+    } finally {
+      setIsCheckingStatus(false);
+    }
   };
 
   const handleSimulateAttachment = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -386,14 +427,60 @@ export default function ReportSituationPage() {
           </div>
 
           {approvalSubmitted && (
-            <div className="p-4 bg-amber-50 border border-amber-200 text-amber-950 rounded-lg text-xs font-semibold space-y-1 animate-in fade-in">
-              <div className="flex items-center gap-2 text-amber-900">
-                <CheckCircle2 size={16} className="text-amber-600 shrink-0" />
-                <span className="font-bold text-sm">Request Submitted ({approvalSubmitted.id})</span>
+            <div className="p-4 bg-amber-50 border border-amber-200 text-amber-950 rounded-lg text-xs space-y-2 animate-in fade-in">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-amber-900">
+                  <CheckCircle2 size={16} className="text-amber-600 shrink-0" />
+                  <span className="font-bold text-sm">Request Submitted</span>
+                  <span className="font-mono text-[11px] text-amber-700">({approvalSubmitted.id})</span>
+                </div>
+                {/* Live status badge */}
+                <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono uppercase ${
+                  approvalSubmitted.status === 'approved'
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                    : approvalSubmitted.status === 'rejected'
+                    ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                    : 'bg-amber-100 text-amber-800 border border-amber-300'
+                }`}>
+                  {approvalSubmitted.status}
+                </span>
               </div>
               <p className="text-amber-900 text-xs pl-6">
-                Your request for <strong>{approvalSubmitted.item}</strong> has been sent to authorized officials for review.
+                Your request for <strong>{approvalSubmitted.item}</strong> has been sent to authorized officials.
+                {approvalSubmitted.decided_at && (
+                  <span className="ml-1 text-amber-700">
+                    Decision recorded at {new Date(approvalSubmitted.decided_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.
+                  </span>
+                )}
               </p>
+              <div className="pl-6 flex items-center gap-2 pt-0.5">
+                <button
+                  type="button"
+                  onClick={handleCheckApprovalStatus}
+                  disabled={isCheckingStatus}
+                  className="text-[11px] font-semibold text-amber-800 underline underline-offset-2 hover:text-amber-950 disabled:opacity-50 cursor-pointer"
+                >
+                  {isCheckingStatus ? 'Checking…' : 'Check Status'}
+                </button>
+                <span className="text-amber-400">·</span>
+                <button
+                  type="button"
+                  onClick={() => { setApprovalSubmitted(null); setApprovalError(null); }}
+                  className="text-[11px] font-semibold text-amber-800 underline underline-offset-2 hover:text-amber-950 cursor-pointer"
+                >
+                  New Request
+                </button>
+              </div>
+            </div>
+          )}
+
+          {approvalError && (
+            <div className="p-4 bg-rose-50 border border-rose-200 text-rose-950 rounded-lg text-xs font-semibold space-y-1 animate-in fade-in">
+              <div className="flex items-center gap-2 text-rose-900">
+                <AlertTriangle size={16} className="text-rose-600 shrink-0" />
+                <span className="font-bold text-sm">Request could not be submitted</span>
+              </div>
+              <p className="text-rose-800 text-xs pl-6">{approvalError}</p>
             </div>
           )}
 
@@ -429,9 +516,11 @@ export default function ReportSituationPage() {
 
             <Button
               type="submit"
-              className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs py-2.5 cursor-pointer flex items-center justify-center gap-2 shadow-2xs"
+              disabled={isSubmittingApproval || !!approvalSubmitted}
+              className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs py-2.5 cursor-pointer flex items-center justify-center gap-2 shadow-2xs disabled:opacity-60"
             >
-              <ShieldCheck size={14} /> Ask Approval
+              <ShieldCheck size={14} />
+              {isSubmittingApproval ? 'Sending Request…' : 'Ask Approval'}
             </Button>
           </form>
         </Card>
