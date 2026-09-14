@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 
 export interface VolunteerSessionData {
-  id: string; // e.g. VOL-MOCK-7F3A
+  /** Server-generated user ID returned by POST /auth/register or POST /auth/login (e.g. "USR-A3F2B1"). */
+  id: string;
   role: 'individual' | 'ngo_coordinator';
   fullName: string;
   age?: number;
@@ -16,6 +17,13 @@ export interface VolunteerSessionData {
   ngoName?: string;
   organizationDetails?: string;
   createdAt: string;
+  /**
+   * The backend incident ID this volunteer is currently assigned to.
+   * Set after the volunteer's mission is linked to a processed incident.
+   * Used by the Report Situation page to call POST /incidents/{id}/reports.
+   * Absent when no mission has been assigned yet.
+   */
+  currentIncidentId?: string;
 }
 
 const STORAGE_KEY = 'rakshakos-volunteer-session';

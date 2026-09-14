@@ -1,11 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { DetailModal, ModalContentData } from '@/components/official/DetailModal';
 import { mockFieldReports, FieldSituationReport } from '@/lib/mock/volunteer-operations-data';
+import { mockVolunteerMission } from '@/lib/mock/volunteer-operations-data';
+import { getVolunteerSession } from '@/lib/volunteer-session';
+import { submitFieldReport, ApiError } from '@/lib/api';
 import {
   FileText,
   Send,
@@ -14,6 +17,7 @@ import {
   Clock,
   Paperclip,
   ShieldCheck,
+  AlertTriangle,
 } from 'lucide-react';
 
 export default function ReportSituationPage() {
@@ -25,9 +29,30 @@ export default function ReportSituationPage() {
   const [descriptionInput, setDescriptionInput] = useState<string>('');
   const [attachmentName, setAttachmentName] = useState<string>('');
 
-  // Submit Feedback
-  const [submittedNotice, setSubmittedNotice] = useState<{ id: string } | null>(null);
+  // Submission state — tracks the active incident ID and backend response
+  const [incidentId, setIncidentId] = useState<string>(mockVolunteerMission.incidentId);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submittedNotice, setSubmittedNotice] = useState<{ id: string; planVersion?: number } | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [selectedReportModal, setSelectedReportModal] = useState<FieldSituationReport | null>(null);
+
+  // Approval Request State
+  const [approvalItemInput, setApprovalItemInput] = useState<string>('');
+  const [approvalDetailsInput, setApprovalDetailsInput] = useState<string>('');
+  const [approvalSubmitted, setApprovalSubmitted] = useState<{ id: string; item: string } | null>(null);
+
+  // Resolve the active incident ID from the volunteer session on mount.
+  // The session's currentIncidentId is written by the command-center page
+  // after a successful POST /process_incident call.
+  // Falls back to the mission mock's incidentId when no session exists.
+  useEffect(() => {
+    const session = getVolunteerSession();
+    if (session?.currentIncidentId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIncidentId(session.currentIncidentId);
+    }
+    // mockVolunteerMission.incidentId is the default already set in useState above
+  }, []);
 
   const categories: FieldSituationReport['category'][] = [
     'New Survivor',
@@ -38,31 +63,71 @@ export default function ReportSituationPage() {
     'Other',
   ];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!descriptionInput.trim() || !locationInput.trim()) return;
 
-    const newReport: FieldSituationReport = {
-      id: `RPT-${Date.now().toString().slice(-4)}`,
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    // Optimistic local report entry shown immediately in the history list
+    const localId = `RPT-${Date.now().toString().slice(-4)}`;
+    const localReport: FieldSituationReport = {
+      id: localId,
       category: selectedCategory,
       description: descriptionInput.trim(),
       location: locationInput.trim(),
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      status: 'Received',
+      status: 'Under Review',
       attachmentName: attachmentName ? attachmentName : undefined,
     };
 
-    setReportsHistory([newReport, ...reportsHistory]);
-    setDescriptionInput('');
-    setAttachmentName('');
-    setSubmittedNotice({ id: newReport.id });
-    setTimeout(() => setSubmittedNotice(null), 5000);
-  };
+    try {
+      // POST to the existing backend endpoint.
+      // The backend appends the report to the incident, increments plan_version,
+      // reruns the full agent pipeline, and returns the updated CommandCenterOverview.
+      const response = await submitFieldReport(incidentId, {
+        category: selectedCategory,
+        location: locationInput.trim(),
+        description: descriptionInput.trim(),
+        source_type: 'volunteer',
+      });
 
-  // Approval Request State
-  const [approvalItemInput, setApprovalItemInput] = useState<string>('');
-  const [approvalDetailsInput, setApprovalDetailsInput] = useState<string>('');
-  const [approvalSubmitted, setApprovalSubmitted] = useState<{ id: string; item: string } | null>(null);
+      // Use the backend-assigned ID if available, otherwise keep the local one
+      const confirmedId = response.incident_id
+        ? `RPT-${response.incident_id.slice(-4)}`
+        : localId;
+
+      const confirmedReport: FieldSituationReport = {
+        ...localReport,
+        id: confirmedId,
+        status: 'Under Review',
+      };
+
+      setReportsHistory((prev) => [confirmedReport, ...prev]);
+      setDescriptionInput('');
+      setAttachmentName('');
+      setSubmittedNotice({ id: confirmedId, planVersion: response.plan_version });
+      setTimeout(() => setSubmittedNotice(null), 6000);
+    } catch (err) {
+      // API failure — still show the report locally so the volunteer's
+      // observation is not silently lost. Surface the error clearly.
+      setReportsHistory((prev) => [localReport, ...prev]);
+      setDescriptionInput('');
+      setAttachmentName('');
+
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+          ? err.message
+          : 'Report could not reach the backend. It has been saved locally.';
+      setSubmitError(message);
+      setTimeout(() => setSubmitError(null), 8000);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleApprovalSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,7 +155,7 @@ export default function ReportSituationPage() {
     fields: [
       { label: 'Report ID', value: rpt.id, mono: true },
       { label: 'Category', value: rpt.category, mono: true },
-      { label: 'Location Vector', value: rpt.location },
+      { label: 'Location', value: rpt.location },
       { label: 'Submission Status', value: rpt.status, mono: true },
       { label: 'Attachment', value: rpt.attachmentName || 'No Media Attached' },
     ],
@@ -148,8 +213,23 @@ export default function ReportSituationPage() {
                 <span className="font-bold text-sm">Report Submitted ({submittedNotice.id})</span>
               </div>
               <p className="text-emerald-900 text-xs pl-6">
-                Report recorded for response processing by Command EOC.
+                Report received by Command EOC and entered the agent pipeline.
+                {submittedNotice.planVersion !== undefined && (
+                  <span className="ml-1 font-mono font-bold">
+                    Active plan: V{submittedNotice.planVersion}
+                  </span>
+                )}
               </p>
+            </div>
+          )}
+
+          {submitError && (
+            <div className="p-4 bg-rose-50 border border-rose-200 text-rose-950 rounded-lg text-xs font-semibold space-y-1 animate-in fade-in">
+              <div className="flex items-center gap-2 text-rose-900">
+                <AlertTriangle size={16} className="text-rose-600 shrink-0" />
+                <span className="font-bold text-sm">Backend unreachable — report saved locally</span>
+              </div>
+              <p className="text-rose-800 text-xs pl-6">{submitError}</p>
             </div>
           )}
 
@@ -230,9 +310,11 @@ export default function ReportSituationPage() {
 
             <Button
               type="submit"
-              className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs py-2.5 cursor-pointer flex items-center justify-center gap-2 shadow-2xs"
+              disabled={isSubmitting}
+              className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs py-2.5 cursor-pointer flex items-center justify-center gap-2 shadow-2xs disabled:opacity-60"
             >
-              <Send size={14} /> Submit Ground Report
+              <Send size={14} />
+              {isSubmitting ? 'Sending to Command EOC…' : 'Submit Ground Report'}
             </Button>
           </form>
         </Card>

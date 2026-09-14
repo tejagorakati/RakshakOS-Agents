@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { PageHeader } from '@/components/official/PageHeader';
 import { OperationalStatCard } from '@/components/official/OperationalStatCard';
 import { SituationOverviewMap } from '@/components/official/SituationOverviewMap';
@@ -9,11 +9,68 @@ import { HumanAttentionPanel } from '@/components/official/HumanAttentionPanel';
 import { ResponseStateCard } from '@/components/official/ResponseStateCard';
 import { DetailModal, ModalContentData } from '@/components/official/DetailModal';
 import { mockCommandCenterOverview } from '@/lib/mock/command-center-data';
-import { OperationalStat, AgentActivitySummaryEvent } from '@/lib/types/official';
-import { Filter } from 'lucide-react';
+import { CommandCenterOverview, OperationalStat, AgentActivitySummaryEvent } from '@/lib/types/official';
+import { processIncident } from '@/lib/api';
+import { saveVolunteerSession, getVolunteerSession } from '@/lib/volunteer-session';
+import { Filter, RefreshCw, AlertTriangle, X } from 'lucide-react';
+
+// Demo incident payload — matches the Vijayawada flood scenario the backend agents are tuned for.
+// Coordinates: Vijayawada, Andhra Pradesh.
+const DEMO_INCIDENT_PAYLOAD = {
+  incident_id: 'INC-DEMO-001',
+  disaster_type: 'flood',
+  location: 'Vijayawada, Andhra Pradesh',
+  latitude: 16.5062,
+  longitude: 80.6480,
+  start_lat: 16.5200,
+  start_lon: 80.6200,
+  end_lat: 16.4900,
+  end_lon: 80.6700,
+  priority: 'P1',
+  requirements: ['rescue_team', 'ambulance', 'medical_kit'],
+  reports: [],
+  plan_version: 1,
+} as const;
 
 export default function CommandCenterPage() {
-  const data = mockCommandCenterOverview;
+  const [data, setData] = useState<CommandCenterOverview>(mockCommandCenterOverview);
+  const [isLive, setIsLive] = useState(false);
+  const [isLoadingLive, setIsLoadingLive] = useState(false);
+  const [liveError, setLiveError] = useState<string | null>(null);
+
+  // Fetch live data from the backend on mount
+  const loadLiveData = useCallback(async () => {
+    setIsLoadingLive(true);
+    setLiveError(null);
+    try {
+      const response = await processIncident({
+        ...DEMO_INCIDENT_PAYLOAD,
+        requirements: [...DEMO_INCIDENT_PAYLOAD.requirements],
+        reports: [...DEMO_INCIDENT_PAYLOAD.reports],
+      });
+      if (response.data) {
+        setData(response.data);
+        setIsLive(true);
+        // Persist the demo incident ID into the volunteer session so the
+        // report-situation page can pass it to POST /incidents/{id}/reports.
+        const session = getVolunteerSession();
+        if (session) {
+          saveVolunteerSession({ ...session, currentIncidentId: DEMO_INCIDENT_PAYLOAD.incident_id });
+        }
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Could not connect to backend.';
+      setLiveError(msg);
+      // Keep showing mock data — dashboard remains usable offline.
+    } finally {
+      setIsLoadingLive(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadLiveData();
+  }, [loadLiveData]);
 
   // Local Interactivity State
   const [severityFilter, setSeverityFilter] = useState<'ALL' | 'CRITICAL' | 'WARNING' | 'ACTIVE'>('ALL');
@@ -190,6 +247,40 @@ export default function CommandCenterPage() {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto px-4 md:px-6 py-6 font-sans">
+      {/* Live data status strip */}
+      {isLoadingLive && (
+        <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-600 font-sans">
+          <RefreshCw size={13} className="animate-spin text-slate-500 shrink-0" />
+          <span>Connecting to backend — processing incident through agent pipeline…</span>
+        </div>
+      )}
+      {liveError && !isLoadingLive && (
+        <div className="flex items-start gap-2 px-4 py-2.5 rounded-lg border border-amber-200 bg-amber-50 text-xs text-amber-900 font-sans">
+          <AlertTriangle size={13} className="text-amber-600 shrink-0 mt-0.5" />
+          <span className="flex-1">Backend unavailable — showing prototype data. ({liveError})</span>
+          <button
+            type="button"
+            onClick={() => setLiveError(null)}
+            className="text-amber-600 hover:text-amber-800 cursor-pointer shrink-0"
+            aria-label="Dismiss"
+          >
+            <X size={13} />
+          </button>
+        </div>
+      )}
+      {isLive && !isLoadingLive && (
+        <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-emerald-200 bg-emerald-50 text-xs text-emerald-800 font-sans">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+          <span>Live agent data — incident <span className="font-mono font-bold">{DEMO_INCIDENT_PAYLOAD.incident_id}</span> processed.</span>
+          <button
+            type="button"
+            onClick={loadLiveData}
+            className="ml-auto flex items-center gap-1 text-emerald-700 hover:text-emerald-900 cursor-pointer font-semibold"
+          >
+            <RefreshCw size={11} /> Reprocess
+          </button>
+        </div>
+      )}
       {/* Page Header */}
       <PageHeader
         title="Command Center"
