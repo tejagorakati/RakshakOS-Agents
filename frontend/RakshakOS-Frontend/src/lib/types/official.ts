@@ -183,4 +183,27 @@ export interface CommandCenterOverview {
   agentActivity: AgentActivitySummaryEvent[];
   humanAttentionItems: HumanAttentionItem[];
   activeState: ActiveOperationalState;
+  responseConclusion?: string;
+  responseConclusionLines?: string[];
+  resourceInventory?: Array<{
+    resourceId: string;
+    resourceType: string;
+    capability: string;
+    status: string;
+    location: string;
+    available: boolean;
+  }>;
+  planLifecycle?: Array<{
+    version: string;
+    status: string;
+    objective: string;
+    priority: string;
+    requiredResources: string[];
+    assignedResources: string[];
+    shortages: string[];
+    route: string;
+    hazards: string[];
+    nextActions: string[];
+    trigger: string;
+  }>;
 }

@@ -90,6 +90,21 @@ export default function CommandCenterPage() {
         const session = getVolunteerSession();
         if (session) {
           saveVolunteerSession({ ...session, currentIncidentId: DEMO_INCIDENT_PAYLOAD.incident_id });
+        } else {
+          saveVolunteerSession({
+            id: 'VOL-9082',
+            role: 'individual',
+            fullName: 'Arun Kumar',
+            age: 29,
+            sex: 'Male',
+            mobileNumber: '+91 98765-43210',
+            email: 'arun.kumar@civilnet.org',
+            regionLocation: 'Sector 7',
+            skills: ['Water Rescue Level 1', 'First Aid / CPR', 'Boat Navigation'],
+            availability: 'AVAILABLE',
+            createdAt: new Date().toISOString(),
+            currentIncidentId: DEMO_INCIDENT_PAYLOAD.incident_id,
+          });
         }
       }
     } catch (err) {
@@ -386,6 +401,57 @@ export default function CommandCenterPage() {
           onInspectIncident={handleInspectIncident}
           onInspectTeam={handleInspectTeam}
         />
+      </section>
+
+      <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 border border-slate-200 bg-white shadow-2xs rounded-xl p-5">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">Agent response conclusion</h2>
+              <p className="text-xs text-slate-500">Latest ground evidence translated into an operational decision.</p>
+            </div>
+            <span className="text-[10px] font-mono font-bold uppercase text-emerald-700">Live synthesis</span>
+          </div>
+          <ol className="list-decimal list-inside space-y-1 text-xs leading-relaxed text-slate-700">
+            {(data.responseConclusionLines ?? [data.responseConclusion ?? 'Awaiting the first ground report.']).slice(0, 8).map((line, index) => (
+              <li key={`${line}-${index}`} className="pl-1">{line}</li>
+            ))}
+          </ol>
+        </div>
+
+        <div className="border border-slate-200 bg-white shadow-2xs rounded-xl p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-bold text-slate-900">Plan and resources</h2>
+            <span className="text-[10px] font-mono font-bold text-slate-500">{data.planLifecycle?.[0]?.version ?? data.activeState.planVersion}</span>
+          </div>
+          {data.planLifecycle?.[0] && (
+            <div className="mb-4 space-y-2 text-xs text-slate-700">
+              <div><span className="font-semibold text-slate-900">Objective:</span> {data.planLifecycle[0].objective}</div>
+              <div><span className="font-semibold text-slate-900">Route:</span> {data.planLifecycle[0].route}</div>
+              <div><span className="font-semibold text-slate-900">Required:</span> {data.planLifecycle[0].requiredResources.join(', ') || 'Assessment-driven allocation'}</div>
+              <div><span className="font-semibold text-slate-900">Assigned:</span> {data.planLifecycle[0].assignedResources.join(', ') || 'Awaiting assignment'}</div>
+              {data.planLifecycle[0].shortages.length > 0 && (
+                <div className="text-amber-700"><span className="font-semibold">Shortages:</span> {data.planLifecycle[0].shortages.join(', ')}</div>
+              )}
+              {data.planLifecycle[0].nextActions.length > 0 && (
+                <div><span className="font-semibold text-slate-900">Next:</span> {data.planLifecycle[0].nextActions.join(', ')}</div>
+              )}
+            </div>
+          )}
+          <div className="space-y-2 border-t border-slate-100 pt-3 text-xs">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Live resource allocation</div>
+            {(data.resourceInventory ?? []).map((resource, index) => (
+              <div key={`${resource.resourceId}-${resource.status}-${index}`} className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                <div className="min-w-0">
+                  <div className="truncate font-medium text-slate-700">{resource.resourceId}</div>
+                  <div className="truncate text-[10px] text-slate-500">{resource.capability} · {resource.location}</div>
+                </div>
+                <span className={resource.available ? 'text-emerald-700 font-semibold' : 'text-amber-700 font-semibold'}>{resource.status}</span>
+              </div>
+            ))}
+            {!data.resourceInventory?.length && <p className="text-slate-400">No resource state reported yet.</p>}
+          </div>
+        </div>
       </section>
 
       {/* SECTION 6 — HUMAN ATTENTION (EXCEPTIONAL APPROVALS GATE) */}

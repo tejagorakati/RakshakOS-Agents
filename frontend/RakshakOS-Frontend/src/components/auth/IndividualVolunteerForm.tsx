@@ -36,6 +36,8 @@ export const IndividualVolunteerForm: React.FC<IndividualVolunteerFormProps> = (
   const [sex, setSex] = useState<SexCategory | ''>('');
   const [mobileNumber, setMobileNumber] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [passwordConfirmation, setPasswordConfirmation] = useState('');
   const [regionLocation, setRegionLocation] = useState('');
   const [skills, setSkills] = useState<string[]>(['First Aid / Medical']);
   const [availability, setAvailability] = useState<AvailabilityStatus>('Available');
@@ -53,6 +55,8 @@ export const IndividualVolunteerForm: React.FC<IndividualVolunteerFormProps> = (
     else if (mobileNumber.trim().length < 8) e.mobileNumber = 'Must be at least 8 digits.';
     if (!email.trim()) e.email = 'Email is required.';
     else if (!email.includes('@') || !email.includes('.')) e.email = 'Enter a valid email address.';
+    if (password.length < 8) e.password = 'Password must be at least 8 characters.';
+    if (password !== passwordConfirmation) e.passwordConfirmation = 'Passwords do not match.';
     if (!regionLocation.trim()) e.regionLocation = 'Region is required.';
     if (skills.length === 0) e.skills = 'Select at least one skill.';
     setErrors(e);
@@ -71,6 +75,7 @@ export const IndividualVolunteerForm: React.FC<IndividualVolunteerFormProps> = (
       age: Number(age),
       sex: sex as SexCategory,
       mobileNumber: mobileNumber.trim(),
+      password,
       email: email.trim(),
       regionLocation: regionLocation.trim(),
       skills,
@@ -154,6 +159,32 @@ export const IndividualVolunteerForm: React.FC<IndividualVolunteerFormProps> = (
               className={`${inputBase} ${errors.email ? inputError : inputNormal}`}
             />
             {errors.email && <p className={errorMsg}>{errors.email}</p>}
+          </div>
+
+          <div className="sm:col-span-3">
+            <label className={fieldLabel}>Password <span className="text-rose-500">*</span></label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="At least 8 characters"
+              className={`${inputBase} ${errors.password ? inputError : inputNormal}`}
+              autoComplete="new-password"
+            />
+            {errors.password && <p className={errorMsg}>{errors.password}</p>}
+          </div>
+
+          <div className="sm:col-span-3">
+            <label className={fieldLabel}>Confirm Password <span className="text-rose-500">*</span></label>
+            <input
+              type="password"
+              value={passwordConfirmation}
+              onChange={(e) => setPasswordConfirmation(e.target.value)}
+              placeholder="Re-enter your password"
+              className={`${inputBase} ${errors.passwordConfirmation ? inputError : inputNormal}`}
+              autoComplete="new-password"
+            />
+            {errors.passwordConfirmation && <p className={errorMsg}>{errors.passwordConfirmation}</p>}
           </div>
 
           {/* Region — spans full */}

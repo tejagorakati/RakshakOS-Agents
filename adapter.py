@@ -90,12 +90,19 @@ def parse_rakshak_for_nextjs_frontend(orchestrator_output: dict, incident_id: st
     human_attention_items = _build_human_attention_items(
         resource_data, plan_data, incident_id, current_time
     )
-    
+
     # 🎯 Build active operational state
     active_state = _build_active_state(
         incident_id, location, plan_data, resource_data, summary
     )
-    
+
+    # ✅ Build the response conclusion shown to field operators and responders after reports.
+    response_conclusion_lines = _build_response_conclusion_lines(
+        incident_id, location, plan_data, resource_data, ground_data, summary
+    )
+    resource_inventory = _build_resource_inventory(resource_data)
+    plan_lifecycle = _build_plan_lifecycle(plan_data, resource_data, summary)
+
     # 🏗️ Assemble complete CommandCenterOverview structure
     return {
         "disasterScenarioName": summary.get("disaster_type", "Disaster Response Operation"),
@@ -110,7 +117,11 @@ def parse_rakshak_for_nextjs_frontend(orchestrator_output: dict, incident_id: st
         "alerts": alerts,
         "agentActivity": agent_activity,
         "humanAttentionItems": human_attention_items,
-        "activeState": active_state
+        "activeState": active_state,
+        "responseConclusion": "\n".join(response_conclusion_lines),
+        "responseConclusionLines": response_conclusion_lines,
+        "resourceInventory": resource_inventory,
+        "planLifecycle": plan_lifecycle,
     }
 
 
@@ -507,3 +518,71 @@ def _build_active_state(incident_id, location, plan_data, resource_data, summary
         "route": plan_data.get("route", "Route calculation in progress"),
         "lastChange": "Multi-agent coordination active"
     }
+
+
+def _build_resource_inventory(resource_data) -> list:
+    """Return the controlled resource inventory in a frontend-friendly form."""
+    inventory = []
+    assignments = resource_data.get("assignments", [])
+    for idx, assignment in enumerate(assignments):
+        if isinstance(assignment, dict):
+            inventory.append({
+                "resourceId": assignment.get("resource_id", f"RESOURCE-{idx+1}"),
+                "resourceType": assignment.get("resource_type", "resource"),
+                "capability": assignment.get("capability", "varied"),
+                "status": "ASSIGNED",
+                "location": assignment.get("destination", "UNKNOWN"),
+                "available": True,
+            })
+    for idx, shortage in enumerate(resource_data.get("shortages", [])):
+        inventory.append({
+            "resourceId": f"REQUEST-{idx+1}",
+            "resourceType": "shortage",
+            "capability": str(shortage),
+            "status": "REQUESTED",
+            "location": "PENDING",
+            "available": False,
+        })
+    return inventory
+
+
+def _build_plan_lifecycle(plan_data, resource_data, summary) -> list:
+    """Return versioned plan history in a compact format."""
+    version = max(1, int(plan_data.get("version", 1)))
+    route = plan_data.get("route") or "Route under review"
+    objective = plan_data.get("objective") or summary.get("executive_summary") or "Awaiting mission objective"
+    return [{
+        "version": f"V{version}",
+        "status": "ACTIVE",
+        "objective": objective,
+        "assignedResources": [
+            entry.get("resource_id", str(entry)) if isinstance(entry, dict) else str(entry)
+            for entry in resource_data.get("assignments", [])
+        ],
+        "route": route,
+        "trigger": "Ground report accepted and response rerendered." if version > 1 else "Initial plan generated.",
+        "changeReason": "Updated route and resource allocation based on assessment and field evidence.",
+    }]
+
+
+def _build_response_conclusion_lines(incident_id, location, plan_data, resource_data, ground_data, summary) -> list:
+    """Return a 5-10 line operational conclusion shown to field users after a report."""
+    route = plan_data.get("route") or "Operations remain in advisory route mode until field verification is complete."
+    objective = plan_data.get("objective") or "Mission objective is being finalized by the command loop."
+    assigned = [
+        entry.get("resource_id", str(entry)) if isinstance(entry, dict) else str(entry)
+        for entry in resource_data.get("assignments", [])
+    ]
+    verification_state = ground_data.get("verification_state") or "UNVERIFIED"
+    confidence = ground_data.get("confidence") or 0.0
+    hazards = plan_data.get("hazards") or summary.get("critical_alerts") or ["Field conditions are being monitored."]
+    return [
+        f"Incident {incident_id} remains active in {location} with the response loop continuing in real time.",
+        f"Mission objective: {objective}",
+        f"Ground verification status: {verification_state} (confidence {float(confidence):.2f}).",
+        f"Assigned assets: {', '.join(assigned) if assigned else 'Awaiting allocation.'}",
+        f"Operational route: {route}",
+        f"Current watchlist: {', '.join(hazards) if isinstance(hazards, list) else str(hazards)}",
+        f"Next step: maintain monitoring, validate route access, and re-plan if new ground reports change the risk profile.",
+        f"Decision confidence is sufficient for controlled coordination, but human review remains required for out-of-bounds or external requests.",
+    ]

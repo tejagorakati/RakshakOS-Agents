@@ -106,7 +106,7 @@ export const mockVolunteerProfile: VolunteerProfile = {
 
 export const mockVolunteerMission: VolunteerMission = {
   id: 'MSN-018',
-  incidentId: 'INC-032',
+  incidentId: 'INC-DEMO-001',
   incidentTitle: 'Residents Stranded at North Canal',
   objective: 'Reach stranded residents near North Canal, assist with boat evacuation, and deliver emergency medical supplies.',
   priority: 'CRITICAL',

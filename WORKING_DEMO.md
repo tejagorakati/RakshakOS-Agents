@@ -34,10 +34,6 @@ If you want to run the actual AI pipeline:
 start_backend.bat
 ```
 
-**Option B - Command line:**
-```powershell
-cd "C:\Users\tejag\Downloads\RakshakOS_Agents_OpenSource\RakshakOS_Agents_OpenSource"
-python api.py
 ```
 
 ---

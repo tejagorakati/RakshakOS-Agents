@@ -25,6 +25,8 @@ export const NgoCoordinatorForm: React.FC<NgoCoordinatorFormProps> = ({ onSubmit
   const [coordinatorName, setCoordinatorName] = useState('');
   const [coordinatorMobile, setCoordinatorMobile] = useState('');
   const [coordinatorEmail, setCoordinatorEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [passwordConfirmation, setPasswordConfirmation] = useState('');
   const [regionLocation, setRegionLocation] = useState('');
   const [ngoName, setNgoName] = useState('');
   const [organizationDetails, setOrganizationDetails] = useState('');
@@ -54,6 +56,8 @@ export const NgoCoordinatorForm: React.FC<NgoCoordinatorFormProps> = ({ onSubmit
     else if (coordinatorMobile.trim().length < 8) e.coordinatorMobile = 'Must be at least 8 digits.';
     if (!coordinatorEmail.trim()) e.coordinatorEmail = 'Email is required.';
     else if (!coordinatorEmail.includes('@') || !coordinatorEmail.includes('.')) e.coordinatorEmail = 'Enter a valid email address.';
+    if (password.length < 8) e.password = 'Password must be at least 8 characters.';
+    if (password !== passwordConfirmation) e.passwordConfirmation = 'Passwords do not match.';
     if (!regionLocation.trim()) e.regionLocation = 'Region is required.';
     if (!ngoName.trim()) e.ngoName = 'NGO name is required.';
     if (teamMembers.length === 0 && !excelFileName) e.teamMembers = 'Add team members manually or upload an Excel file.';
@@ -74,6 +78,7 @@ export const NgoCoordinatorForm: React.FC<NgoCoordinatorFormProps> = ({ onSubmit
       coordinatorFullName: coordinatorName.trim(),
       coordinatorMobile: coordinatorMobile.trim(),
       coordinatorEmail: coordinatorEmail.trim(),
+      password,
       regionLocation: regionLocation.trim(),
       ngoName: ngoName.trim(),
       organizationDetails: organizationDetails.trim(),
@@ -141,6 +146,32 @@ export const NgoCoordinatorForm: React.FC<NgoCoordinatorFormProps> = ({ onSubmit
               className={`${inputBase} ${errors.regionLocation ? inputError : inputNormal}`}
             />
             {errors.regionLocation && <p className={errorMsg}>{errors.regionLocation}</p>}
+          </div>
+
+          <div>
+            <label className={fieldLabel}>Password <span className="text-rose-500">*</span></label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="At least 8 characters"
+              className={`${inputBase} ${errors.password ? inputError : inputNormal}`}
+              autoComplete="new-password"
+            />
+            {errors.password && <p className={errorMsg}>{errors.password}</p>}
+          </div>
+
+          <div>
+            <label className={fieldLabel}>Confirm Password <span className="text-rose-500">*</span></label>
+            <input
+              type="password"
+              value={passwordConfirmation}
+              onChange={(e) => setPasswordConfirmation(e.target.value)}
+              placeholder="Re-enter your password"
+              className={`${inputBase} ${errors.passwordConfirmation ? inputError : inputNormal}`}
+              autoComplete="new-password"
+            />
+            {errors.passwordConfirmation && <p className={errorMsg}>{errors.passwordConfirmation}</p>}
           </div>
         </div>
       </div>

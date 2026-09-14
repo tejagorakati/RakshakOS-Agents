@@ -13,6 +13,11 @@ export default function RootPortalPage() {
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <BrandLogo size="md" />
           <div className="flex items-center gap-2">
+            <Link href="/auth/login">
+              <Button variant="outline" size="sm" className="text-xs text-slate-600 h-8 gap-1.5">
+                <Lock size={12} /> Responder Sign In
+              </Button>
+            </Link>
             <Link href="/auth/official">
               <Button variant="outline" size="sm" className="text-xs text-slate-600 h-8 gap-1.5">
                 <Lock size={12} /> Official Sign In
@@ -98,7 +103,7 @@ export default function RootPortalPage() {
               <Link href="/auth/volunteer" className="w-full block">
                 <Button className="w-full justify-between bg-emerald-700 hover:bg-emerald-600 text-white text-xs h-9">
                   <span className="flex items-center gap-1.5">
-                    <Users size={13} /> Register / Sign In
+                    <Users size={13} /> Register
                   </span>
                   <ArrowRight size={14} />
                 </Button>

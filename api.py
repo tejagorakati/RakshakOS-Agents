@@ -182,6 +182,16 @@ def _init_db() -> None:
                 decided_at TEXT,
                 official_id TEXT
             );
+            CREATE TABLE IF NOT EXISTS resource_inventory (
+                resource_id TEXT PRIMARY KEY,
+                incident_id TEXT NOT NULL,
+                resource_type TEXT NOT NULL,
+                capability TEXT NOT NULL,
+                status TEXT NOT NULL,
+                location TEXT NOT NULL,
+                available INTEGER NOT NULL,
+                updated_at TEXT NOT NULL
+            );
             """
         )
 
@@ -227,6 +237,141 @@ def _plan_from_output(output: Dict[str, Any]) -> Dict[str, Any]:
         if isinstance(item, dict) and item.get("agent") == "response_planning":
             return item.get("plan") or {}
     return {}
+
+
+def _verification_from_output(output: Dict[str, Any]) -> Dict[str, Any]:
+    for item in output.get("specialist_results", []):
+        if isinstance(item, dict) and item.get("agent") == "ground_verification":
+            return item.get("verification") or {}
+    return {}
+
+
+def _resource_inventory_from_output(output: Dict[str, Any]) -> List[Dict[str, Any]]:
+    for item in output.get("specialist_results", []):
+        if isinstance(item, dict) and item.get("agent") == "resource_management":
+            inventory = []
+            decision = item.get("decision") or {}
+            for assignment in decision.get("assignments", []):
+                if isinstance(assignment, dict):
+                    inventory.append({
+                        "resource_id": assignment.get("resource_id", "UNKNOWN"),
+                        "resource_type": assignment.get("resource_type", "resource"),
+                        "capability": assignment.get("capability", "unknown"),
+                        "status": "ASSIGNED",
+                        "location": assignment.get("destination", "UNKNOWN"),
+                        "available": True,
+                    })
+            for shortage in decision.get("shortages", []):
+                inventory.append({
+                    "resource_id": str(shortage),
+                    "resource_type": "shortage",
+                    "capability": "requested",
+                    "status": "SHORTAGE",
+                    "location": "REQUEST_PENDING",
+                    "available": False,
+                })
+            return inventory
+    return []
+
+
+def _save_resource_inventory(incident_id: str, output: Dict[str, Any]) -> List[Dict[str, Any]]:
+    inventory = _resource_inventory_from_output(output)
+    with _db() as connection:
+        for item in inventory:
+            connection.execute(
+                "INSERT INTO resource_inventory (resource_id, incident_id, resource_type, capability, status, location, available, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT(resource_id) DO UPDATE SET incident_id=excluded.incident_id, resource_type=excluded.resource_type, capability=excluded.capability, status=excluded.status, location=excluded.location, available=excluded.available, updated_at=excluded.updated_at",
+                (
+                    item["resource_id"],
+                    incident_id,
+                    item["resource_type"],
+                    item["capability"],
+                    item["status"],
+                    item["location"],
+                    1 if item["available"] else 0,
+                    datetime.now(timezone.utc).isoformat(),
+                ),
+            )
+    return inventory
+
+
+def _load_resource_inventory(incident_id: str) -> List[Dict[str, Any]]:
+    with _db() as connection:
+        rows = connection.execute(
+            "SELECT resource_id, resource_type, capability, status, location, available FROM resource_inventory WHERE incident_id = ? ORDER BY updated_at DESC",
+            (incident_id,),
+        ).fetchall()
+    return [{
+        "resourceId": row["resource_id"],
+        "resourceType": row["resource_type"],
+        "capability": row["capability"],
+        "status": row["status"],
+        "location": row["location"],
+        "available": bool(row["available"]),
+    } for row in rows]
+
+
+def _build_plan_lifecycle(plan: Dict[str, Any], event: Dict[str, Any], output: Dict[str, Any], status: str) -> List[Dict[str, Any]]:
+    resource_decision = next((
+        item.get("decision") or {}
+        for item in output.get("specialist_results", [])
+        if isinstance(item, dict) and item.get("agent") == "resource_management"
+    ), {})
+    assignments = resource_decision.get("assignments", [])
+    shortages = resource_decision.get("shortages", [])
+    requirements = event.get("requirements", []) or []
+    route = plan.get("route") or "Route validation required before dispatch."
+    if isinstance(route, dict):
+        route = route.get("summary") or route.get("physical_access_note") or "Route validation required before dispatch."
+    return [{
+        "version": f"V{plan.get('version', event.get('plan_version', 1))}",
+        "status": status,
+        "objective": plan.get("objective") or "Coordinate a verified and safe response to the incident.",
+        "priority": plan.get("priority") or event.get("priority", "P2"),
+        "requiredResources": [str(item) for item in requirements],
+        "assignedResources": [
+            item.get("resource_id", str(item)) if isinstance(item, dict) else str(item)
+            for item in assignments
+        ],
+        "shortages": [str(item) for item in shortages],
+        "route": str(route),
+        "hazards": [str(item) for item in (plan.get("hazards") or [])],
+        "nextActions": [str(item) for item in (plan.get("trigger_conditions") or plan.get("next_actions") or [])],
+        "trigger": "Ground report accepted; agents re-evaluated route and allocation." if status == "REPLAN" else "Initial incident assessment completed.",
+    }]
+
+
+def _build_response_conclusion(incident_id: str, event: Dict[str, Any], output: Dict[str, Any]) -> Dict[str, Any]:
+    summary = output.get("summary", {}) or {}
+    plan = _plan_from_output(output)
+    verification = _verification_from_output(output)
+    impact = {}
+    for item in output.get("specialist_results", []):
+        if isinstance(item, dict) and item.get("agent") == "situation_impact":
+            impact = item.get("assessment") or {}
+            break
+    resources = _resource_inventory_from_output(output)
+    resource_names = [res.get("resource_id") for res in resources if isinstance(res, dict)]
+    route_summary = plan.get("route") or "Route validation is pending manual confirmation."
+    verification_state = verification.get("verification_state") or "UNVERIFIED"
+    confidence = verification.get("confidence") or 0
+    severity = impact.get("severity") or summary.get("severity") or "Moderate"
+    status = summary.get("status") or "PENDING_REVIEW"
+    lines = [
+        f"Incident {incident_id} is operating in {status.lower().replace('_', ' ')} mode with {severity.lower()} severity.",
+        f"Ground verification is {verification_state.lower()} with {confidence:.2f} confidence from fresh field reporting.",
+        f"Mission objective: {plan.get('objective') or 'Awaiting final mission objective assignment.'}",
+        f"Assigned response assets: {', '.join(resource_names) if resource_names else 'Awaiting allocation.'}",
+        f"Operational route: {route_summary}",
+        f"Watchlist: {', '.join(plan.get('hazards', []) or impact.get('hazards', []) or ['No major hazard flagged'])}.",
+        f"Next action: {summary.get('next_action') or 'Continue monitoring and re-plan if new ground reports change the route or access risk.'}",
+    ]
+    return {
+        "text": "\n".join(lines),
+        "lines": lines,
+        "status": status,
+        "confidence": float(confidence),
+    }
 
 
 def _build_mission_brief(incident_id: str, event: Dict[str, Any], output: Dict[str, Any]) -> Dict[str, Any]:
@@ -752,16 +897,28 @@ async def process_incident(request: IncidentRequest) -> dict:
         # Run the multi-agent pipeline
         raw_output = run_rakshak(event)
         _save_incident(event, raw_output)
+        _save_resource_inventory(request.incident_id, raw_output)
         _save_session_message(request.incident_id, "RakshakOS Agent", "Initial incident assessment and response plan created.")
         
         # Transform raw output into Next.js frontend-compatible format
         command_center_data = parse_rakshak_for_nextjs_frontend(raw_output, request.incident_id)
+        conclusion = _build_response_conclusion(request.incident_id, event, raw_output)
+        command_center_data["responseConclusion"] = conclusion["text"]
+        command_center_data["responseConclusionLines"] = conclusion["lines"]
+        command_center_data["resourceInventory"] = _load_resource_inventory(request.incident_id)
+        command_center_data["planLifecycle"] = _build_plan_lifecycle(
+            _plan_from_output(raw_output), event, raw_output, "ACTIVE"
+        )
         
         return {
             "status": "success",
             "data": command_center_data,
             "streamlit_data": parse_rakshak_for_ui(raw_output, request.incident_id),
-            "raw_output": raw_output  # Include raw output for debugging
+            "raw_output": raw_output,
+            "response_conclusion": conclusion["text"],
+            "response_conclusion_lines": conclusion["lines"],
+            "resource_inventory": command_center_data["resourceInventory"],
+            "plan_lifecycle": command_center_data["planLifecycle"],
         }
         
     except Exception as e:
@@ -793,15 +950,31 @@ async def submit_situation_report(incident_id: str, request: SituationReportRequ
     event["plan_version"] = int(event.get("plan_version", 1)) + 1
     raw_output = run_rakshak(event)
     _save_incident(event, raw_output)
+    _save_resource_inventory(incident_id, raw_output)
     _save_session_message(incident_id, "Field Report", f"{request.category}: {request.description} at {request.location}")
     _save_session_message(incident_id, "RakshakOS Agent", f"Plan re-evaluated. Active plan version is {event['plan_version']}.")
+    command_center_data = parse_rakshak_for_nextjs_frontend(raw_output, incident_id)
+    conclusion = _build_response_conclusion(incident_id, event, raw_output)
+    command_center_data["responseConclusion"] = conclusion["text"]
+    command_center_data["responseConclusionLines"] = conclusion["lines"]
+    command_center_data["resourceInventory"] = _load_resource_inventory(incident_id)
+    command_center_data["planLifecycle"] = _build_plan_lifecycle(
+        _plan_from_output(raw_output),
+        event,
+        raw_output,
+        "REPLAN" if event.get("plan_version", 1) > 1 else "ACTIVE",
+    )
     return {
         "status": "success",
         "incident_id": incident_id,
         "plan_version": event["plan_version"],
-        "data": parse_rakshak_for_nextjs_frontend(raw_output, incident_id),
+        "data": command_center_data,
         "streamlit_data": parse_rakshak_for_ui(raw_output, incident_id),
         "raw_output": raw_output,
+        "response_conclusion": conclusion["text"],
+        "response_conclusion_lines": conclusion["lines"],
+        "resource_inventory": command_center_data["resourceInventory"],
+        "plan_lifecycle": command_center_data["planLifecycle"],
     }
 
 

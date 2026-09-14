@@ -20,6 +20,7 @@ export default function VolunteerAuthPage() {
   const [selectedRole, setSelectedRole] = useState<VolunteerRoleType>('individual');
   const [isLoading, setIsLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [accountCredentials, setAccountCredentials] = useState<{ email: string; password: string } | null>(null);
   const [submittedData, setSubmittedData] = useState<{
     role: VolunteerRoleType;
     data: IndividualVolunteerRegistration | NgoCoordinatorRegistration;
@@ -49,11 +50,7 @@ export default function VolunteerAuthPage() {
       let userId: string;
 
       try {
-        // Attempt registration with a generated password derived from email + name.
-        // A real auth system would collect a password; for this demo the backend
-        // requires one so we derive a deterministic value the volunteer can always
-        // reconstruct.  This is intentional and documented.
-        const password = `${formData.email.split('@')[0]}-RakshakOS`;
+        const password = formData.password;
         const result = await registerUser({
           role: 'individual',
           email: formData.email,
@@ -64,7 +61,7 @@ export default function VolunteerAuthPage() {
       } catch (err) {
         if (err instanceof ApiError && err.status === 409) {
           // Account already exists — log them in to retrieve the real ID
-          const password = `${formData.email.split('@')[0]}-RakshakOS`;
+          const password = formData.password;
           const loginResult = await loginUser({ email: formData.email, password });
           userId = loginResult.user.id;
         } else {
@@ -86,6 +83,7 @@ export default function VolunteerAuthPage() {
         createdAt: new Date().toISOString(),
       };
       saveVolunteerSession(sessionData);
+      setAccountCredentials({ email: formData.email, password: formData.password });
 
       setSubmittedData({
         role: 'individual',
@@ -124,7 +122,7 @@ export default function VolunteerAuthPage() {
       let userId: string;
 
       try {
-        const password = `${formData.coordinatorEmail.split('@')[0]}-RakshakOS`;
+        const password = formData.password;
         const result = await registerUser({
           role: 'ngo_coordinator',
           email: formData.coordinatorEmail,
@@ -134,7 +132,7 @@ export default function VolunteerAuthPage() {
         userId = result.user.id;
       } catch (err) {
         if (err instanceof ApiError && err.status === 409) {
-          const password = `${formData.coordinatorEmail.split('@')[0]}-RakshakOS`;
+          const password = formData.password;
           const loginResult = await loginUser({
             email: formData.coordinatorEmail,
             password,
@@ -175,6 +173,7 @@ export default function VolunteerAuthPage() {
         createdAt: new Date().toISOString(),
       };
       saveVolunteerSession(sessionData);
+      setAccountCredentials({ email: formData.coordinatorEmail, password: formData.password });
 
       setSubmittedData({
         role: 'ngo_coordinator',
@@ -222,6 +221,12 @@ export default function VolunteerAuthPage() {
             <p className="text-sm text-slate-500">
               Choose your participation role and complete registration.
             </p>
+            <p className="text-xs text-slate-500 pt-2">
+              Already registered?{' '}
+              <Link href="/auth/login" className="font-semibold text-emerald-700 hover:text-emerald-800">
+                Sign in with email and password
+              </Link>
+            </p>
           </div>
         )}
 
@@ -259,11 +264,28 @@ export default function VolunteerAuthPage() {
                 Your responder profile has been registered. You can now access the Volunteer Response Center.
               </p>
 
+              {accountCredentials && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 space-y-2">
+                  <p className="text-xs font-bold uppercase tracking-wider text-amber-900">Your login credentials</p>
+                  <p className="text-xs text-amber-900">Save these details. Your password is stored securely and cannot be recovered from the server.</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    <div className="rounded border border-amber-200 bg-white px-3 py-2">
+                      <span className="block text-[10px] uppercase text-amber-700">Email</span>
+                      <span className="font-mono font-semibold text-slate-900 break-all">{accountCredentials.email}</span>
+                    </div>
+                    <div className="rounded border border-amber-200 bg-white px-3 py-2">
+                      <span className="block text-[10px] uppercase text-amber-700">Password</span>
+                      <span className="font-mono font-semibold text-slate-900">{accountCredentials.password}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="flex flex-wrap gap-3 pt-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => { setSubmittedData(null); setApiError(null); }}
+                  onClick={() => { setSubmittedData(null); setApiError(null); setAccountCredentials(null); }}
                   className="gap-1.5 text-slate-700 text-xs"
                 >
                   <RefreshCw size={13} /> Register another profile

@@ -9,6 +9,7 @@ export interface IndividualVolunteerRegistration {
   age: number | '';
   sex: SexCategory | '';
   mobileNumber: string;
+  password: string;
   email: string;
   regionLocation: string;
   skills: string[];
@@ -29,6 +30,7 @@ export interface NgoCoordinatorRegistration {
   coordinatorFullName: string;
   coordinatorMobile: string;
   coordinatorEmail: string;
+  password: string;
   regionLocation: string;
   ngoName: string;
   organizationDetails?: string;

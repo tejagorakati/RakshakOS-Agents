@@ -123,6 +123,10 @@ export interface ProcessIncidentRequest {
 export interface ProcessIncidentResponse {
   status: string;
   data: CommandCenterOverview;
+  response_conclusion?: string;
+  response_conclusion_lines?: string[];
+  resource_inventory?: Array<Record<string, unknown>>;
+  plan_lifecycle?: Array<Record<string, unknown>>;
 }
 
 export async function processIncident(
@@ -171,6 +175,10 @@ export interface SubmitReportResponse {
   incident_id: string;
   plan_version: number;
   data: CommandCenterOverview;
+  response_conclusion?: string;
+  response_conclusion_lines?: string[];
+  resource_inventory?: Array<Record<string, unknown>>;
+  plan_lifecycle?: Array<Record<string, unknown>>;
 }
 
 export async function submitFieldReport(
