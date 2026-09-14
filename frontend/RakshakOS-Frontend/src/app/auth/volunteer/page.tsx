@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { BrandLogo } from '@/components/shared/brand-logo';
@@ -12,11 +12,22 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRight, CheckCircle2, RefreshCw, AlertTriangle } from 'lucide-react';
 import { Footer } from '@/components/navigation/footer';
 
-import { saveVolunteerSession, VolunteerSessionData } from '@/lib/volunteer-session';
+import {
+  getVolunteerSession,
+  saveVolunteerSession,
+  VolunteerSessionData,
+} from '@/lib/volunteer-session';
 import { registerUser, loginUser, addNgoMember, ApiError } from '@/lib/api';
 
 export default function VolunteerAuthPage() {
   const router = useRouter();
+  useEffect(() => {
+  const existingSession = getVolunteerSession();
+
+  if (existingSession) {
+    router.replace('/volunteer/home');
+  }
+}, [router]);
   const [selectedRole, setSelectedRole] = useState<VolunteerRoleType>('individual');
   const [isLoading, setIsLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -303,7 +314,9 @@ export default function VolunteerAuthPage() {
                 )}
 
                 <Button
-                  onClick={() => router.push('/volunteer/home')}
+                  onClick={() => {
+                    window.location.href = '/volunteer/home';
+                  }}
                   className="bg-slate-900 hover:bg-slate-800 text-white text-xs gap-1.5"
                 >
                   Proceed to Response Center
